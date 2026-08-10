@@ -81,7 +81,7 @@ export function ScrollMotion() {
         }
 
         gsap.utils
-          .toArray<HTMLElement>(".project-row__summary, .service-row, .process-row")
+          .toArray<HTMLElement>(".service-row, .process-row")
           .forEach((target) => {
             gsap.fromTo(
               target,
@@ -92,6 +92,100 @@ export function ScrollMotion() {
                 duration: 0.82,
                 ease: "power3.out",
                 scrollTrigger: { trigger: target, start: "top 91%", once: true },
+              },
+            );
+          });
+      });
+
+      media.add("(min-width: 1024px)", () => {
+        const projectRows = gsap.utils.toArray<HTMLElement>(
+          "[data-project-row]",
+        );
+
+        projectRows.forEach((row, index) => {
+          const summary = row.querySelector<HTMLElement>(
+            ".project-row__summary",
+          );
+          const title = row.querySelector<HTMLElement>(".project-row__title");
+          const cover = row.querySelector<HTMLImageElement>(
+            ".project-row__cover img",
+          );
+          if (!summary) return;
+
+          ScrollTrigger.create({
+            trigger: row,
+            start: "top 52%",
+            end: "bottom 48%",
+            onToggle: ({ isActive }) => {
+              if (isActive) row.dataset.projectScrollActive = "true";
+              else delete row.dataset.projectScrollActive;
+            },
+          });
+
+          const timeline = gsap.timeline({
+            scrollTrigger: {
+              trigger: row,
+              start: "top bottom",
+              end: "top 22%",
+              scrub: 0.65,
+            },
+          });
+
+          timeline.fromTo(
+            summary,
+            { y: 72, scale: 0.94, clipPath: "inset(8% 0% 0% 0%)" },
+            {
+              y: 0,
+              scale: 1,
+              clipPath: "inset(0% 0% 0% 0%)",
+              ease: "none",
+            },
+            0,
+          );
+
+          if (title) {
+            timeline.fromTo(
+              title,
+              { xPercent: index % 2 === 0 ? 5 : -5 },
+              { xPercent: 0, ease: "none" },
+              0,
+            );
+          }
+
+          if (cover) {
+            timeline.fromTo(
+              cover,
+              { yPercent: -5, scale: 1.14 },
+              { yPercent: 5, scale: 1.02, ease: "none" },
+              0,
+            );
+          }
+        });
+
+        return () => {
+          projectRows.forEach((row) => {
+            delete row.dataset.projectScrollActive;
+          });
+        };
+      });
+
+      media.add("(min-width: 768px) and (max-width: 1023px)", () => {
+        gsap.utils
+          .toArray<HTMLElement>(".project-row__summary")
+          .forEach((target) => {
+            gsap.fromTo(
+              target,
+              { y: 54, opacity: 0 },
+              {
+                y: 0,
+                opacity: 1,
+                duration: 0.82,
+                ease: "power3.out",
+                scrollTrigger: {
+                  trigger: target,
+                  start: "top 91%",
+                  once: true,
+                },
               },
             );
           });

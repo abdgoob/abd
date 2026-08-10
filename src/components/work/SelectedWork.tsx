@@ -220,8 +220,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     quickRotate.current = gsap.quickTo(preview, "rotation", { duration: 0.42, ease: "power3.out" });
     gsap.fromTo(
       next,
-      { opacity: 0, scale: 0.9, clipPath: "inset(8% 8% 8% 8%)" },
-      { opacity: 1, scale: 1, clipPath: "inset(0% 0% 0% 0%)", duration: 0.48, ease: "power3.out", overwrite: true },
+      { opacity: 0, scale: 0.82, clipPath: "circle(12% at 50% 50%)" },
+      { opacity: 1, scale: 1, clipPath: "circle(71% at 50% 50%)", duration: 0.48, ease: "power3.out", overwrite: true },
     );
     window.dispatchEvent(
       new CustomEvent("portfolio:project-hover", { detail: { active: true, slug } }),
@@ -325,7 +325,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     >
       <div className="section-heading section-heading--work">
         <p>Selected work</p>
-        <p>Seven digital experiences / Explore inline</p>
+        <p>Seven digital experiences / Scroll through</p>
       </div>
       <div className="selected-work__intro">
         <h2 id="selected-work-title">Work built to move people — and business.</h2>
@@ -335,7 +335,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
         </p>
       </div>
 
-      <div className="project-index" data-project-index>
+      <div className="project-index" data-project-index data-scroll-driven="stack">
         {items.map((project, projectIndex) => {
           const panelId = `project-panel-${project.slug}`;
           const headingId = `project-heading-${project.slug}`;
@@ -343,6 +343,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
             "--project-bg": project.palette.background,
             "--project-fg": project.palette.foreground,
             "--project-accent": project.palette.accent,
+            "--project-stack-offset": `${projectIndex * 0.34}rem`,
           } as CSSProperties;
 
           return (
@@ -350,7 +351,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
               className="project-row"
               key={project.slug}
               data-project-row={project.slug}
+              data-project-order={projectIndex + 1}
               data-work-item={project.slug}
+              style={palette}
               ref={(node) => {
                 if (node) rowsRef.current.set(project.slug, node);
               }}

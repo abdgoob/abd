@@ -228,6 +228,13 @@ test("project hover preview never escapes the selected-work section", async ({
     );
   }
   await expect(preview).toHaveAttribute("data-preview-active", "zens-den");
+  await expect(preview).toHaveCSS("border-radius", "50%");
+  const previewBounds = await preview.boundingBox();
+  expect(previewBounds).not.toBeNull();
+  if (previewBounds) {
+    expect(Math.abs(previewBounds.width - previewBounds.height)).toBeLessThanOrEqual(1);
+    expect(previewBounds.width).toBeLessThan(300);
+  }
 
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(preview).not.toHaveAttribute("data-preview-active", /.+/);
@@ -247,6 +254,45 @@ test("project hover preview never escapes the selected-work section", async ({
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await expect(preview).not.toHaveAttribute("data-preview-active", /.+/);
   await expect(preview).toBeHidden();
+});
+
+test("desktop projects form a scroll-driven sticky stack", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chromium");
+
+  await page.goto("/");
+  await waitForExperience(page);
+
+  const index = page.locator("[data-project-index]");
+  await expect(index).toHaveAttribute("data-scroll-driven", "stack");
+
+  const firstRow = page.locator('[data-project-row="crav"]');
+  await expect(firstRow).toHaveCSS("position", "sticky");
+  await expect(firstRow.locator(".project-row__cover img")).toBeVisible();
+
+  const summary = firstRow.locator(".project-row__summary");
+  const initialTransform = await summary.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  const rowTop = await firstRow.evaluate(
+    (element) => element.getBoundingClientRect().top + window.scrollY,
+  );
+
+  await page.evaluate((top) => {
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.88));
+  }, rowTop);
+
+  await expect
+    .poll(() =>
+      summary.evaluate((element) => getComputedStyle(element).transform),
+    )
+    .not.toBe(initialTransform);
+
+  await page.evaluate((top) => {
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.2));
+  }, rowTop);
+  await expect(firstRow).toHaveAttribute("data-project-scroll-active", "true");
 });
 
 test("reduced motion keeps the hero static and inline work usable", async ({

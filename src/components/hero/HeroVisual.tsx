@@ -160,13 +160,27 @@ export function HeroVisual() {
 
       const idleTween =
         !staticMotion && avatarIdle
-          ? gsap.to(avatarIdle, {
-              y: -2,
-              duration: 6.2,
-              yoyo: true,
-              repeat: -1,
-              ease: "sine.inOut",
-            })
+          ? gsap
+              .timeline({ repeat: -1 })
+              .to(avatarIdle, {
+                y: -10,
+                rotation: -2.5,
+                duration: 3.2,
+                ease: "sine.inOut",
+                transformOrigin: "50% 100%",
+              })
+              .to(avatarIdle, {
+                y: -4,
+                rotation: 0.5,
+                duration: 2.8,
+                ease: "sine.inOut",
+              })
+              .to(avatarIdle, {
+                y: 0,
+                rotation: 0.5,
+                duration: 2.8,
+                ease: "sine.inOut",
+              })
           : null;
 
       const avatarX = avatarParallax
@@ -178,6 +192,18 @@ export function HeroVisual() {
       const avatarY = avatarParallax
         ? gsap.quickTo(avatarParallax, "y", {
             duration: 1.1,
+            ease: "power3.out",
+          })
+        : null;
+      const avatarRotateX = avatarParallax
+        ? gsap.quickTo(avatarParallax, "rotationX", {
+            duration: 1.1,
+            ease: "power3.out",
+          })
+        : null;
+      const avatarRotateY = avatarParallax
+        ? gsap.quickTo(avatarParallax, "rotationY", {
+            duration: 1.05,
             ease: "power3.out",
           })
         : null;
@@ -215,6 +241,8 @@ export function HeroVisual() {
       const resetPointerMotion = () => {
         avatarX?.(0);
         avatarY?.(0);
+        avatarRotateX?.(0);
+        avatarRotateY?.(0);
         settleReveal();
       };
 
@@ -243,8 +271,10 @@ export function HeroVisual() {
           root.dataset.pointerState = "active";
         }
         window.clearTimeout(pointerTimer);
-        avatarX?.(x * 4);
-        avatarY?.(y * 3);
+        avatarX?.(x * 10);
+        avatarY?.(y * 7);
+        avatarRotateX?.(y * -1.5);
+        avatarRotateY?.(x * 2.5);
 
         if (!titleName || !titleBounds) return;
         const revealPadding = revealRadius * 0.72;
