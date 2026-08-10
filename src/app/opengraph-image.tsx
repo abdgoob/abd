@@ -17,7 +17,7 @@ export default function OpenGraphImage() {
           background: "#fefefe",
           color: "#191711",
           padding: "48px",
-          fontFamily: "Arial, sans-serif",
+          fontFamily: "Helvetica, Arial, sans-serif",
           textTransform: "uppercase",
         }}
       >

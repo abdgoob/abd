@@ -20,7 +20,7 @@
   --color-sand: var(--sand);
   --color-stone: var(--stone);
   --color-paper: var(--paper);
-  --font-sans: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-sans: Helvetica, "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -40,7 +40,7 @@ body {
   overflow-x: clip;
   background: var(--paper);
   color: var(--ink);
-  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
   font-size: clamp(0.95rem, 1.08vw, 1.18rem);
   line-height: 1.34;
   text-rendering: geometricPrecision;
