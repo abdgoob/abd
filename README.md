@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Creative Developer Portfolio
 
-## Getting Started
+Abdullah's single-page editorial portfolio, built with Next.js 16.3, React 19, GSAP, Lenis, and Tailwind CSS 4.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. For a production check:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm run start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Quality checks
 
-## Learn More
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
 
-To learn more about Next.js, take a look at the following resources:
+The Playwright suite runs against a production server in desktop Chromium, mobile Chromium, and desktop WebKit. It covers the seven-project order, inline expansion, hash/history navigation, external links, keyboard and inert states, reduced motion, hero fallbacks, failed priority media, responsive overflow, cursor continuity, and a sustained scroll/resize stress pass.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Content and architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Typed content and contact configuration live in `src/data/`.
+- `/` is the complete experience: Hero → Selected Work → What I Build → How I Work → About → Contact.
+- All seven case studies expand inside the homepage. There are no internal project routes or duplicate semantic reel links.
+- Header navigation uses `#selected-work`, `#services`, and `#about`; `#contact` is also directly addressable.
+- CRAV's separate live-site action opens `https://www.cravburgers.shop/` in a protected new tab.
+- One Lenis instance is connected to GSAP's ticker. The custom cursor and hover media use refs/GSAP setters rather than frame-by-frame React state.
+- Vercel's `VERCEL_PROJECT_PRODUCTION_URL` is used automatically for production metadata. `NEXT_PUBLIC_SITE_URL` remains an optional canonical-origin override.
 
-## Deploy on Vercel
+## Media provenance
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `public/media/crav/` contains local optimized captures of the authorized CRAV site; no remote project media is loaded at runtime.
+- `public/media/zens-den/` contains original, text-free Zen's Den editorial artwork created for the portfolio.
+- `public/media/north-co/`, `nova-ai/`, `archform/`, `forma-studio/`, and `northstar/` contain original, text-free portfolio artwork generated for their respective visual systems. They do not depict client results, testimonials, analytics, awards, or real product dashboards.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contact configuration
+
+`src/data/site.ts` contains Abdullah's supplied WhatsApp URL, `https://wa.me/923342239574`. Primary inquiry actions open that conversation in a protected new tab. Email and LinkedIn remain null and are omitted rather than replaced with placeholders.
