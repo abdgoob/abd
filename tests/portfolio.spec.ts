@@ -40,7 +40,8 @@ async function expectSectionInViewport(page: Page, selector: string) {
 
 async function openProject(page: Page, slug: (typeof projectSlugs)[number]) {
   const button = page.locator(`[data-project-expand="${slug}"]`);
-  await button.click();
+  await button.focus();
+  await page.keyboard.press("Enter");
   const panel = page.locator(`[data-project-panel="${slug}"]`);
   await expect(panel).toHaveAttribute("data-expansion-state", "open");
   await expect(panel).toHaveAttribute("aria-hidden", "false");
@@ -209,51 +210,49 @@ test("collapsed details are isolated and keyboard controls restore focus", async
   await expect(explore).toBeFocused();
 });
 
-test("project hover preview never escapes the selected-work section", async ({
+test("every project cover uses its own viewport-scoped halftone reveal", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium");
   await page.goto("/#selected-work");
   await waitForExperience(page);
 
-  const preview = page.locator("[data-hover-preview]");
-  const row = page.locator('[data-project-row="zens-den"]');
-  await row.scrollIntoViewIfNeeded();
-  const rowBounds = await row.boundingBox();
-  expect(rowBounds).not.toBeNull();
-  if (rowBounds) {
-    await page.mouse.move(
-      rowBounds.x + rowBounds.width * 0.45,
-      rowBounds.y + Math.min(rowBounds.height * 0.4, 80),
+  const media = page.locator("[data-project-halftone]");
+  await expect(media).toHaveCount(projectSlugs.length);
+  const sources = await media.locator("img").evaluateAll((images) =>
+    images.map((image) => image.getAttribute("src") ?? ""),
+  );
+  expect(new Set(sources).size).toBe(projectSlugs.length);
+  expect(sources.every((src) => !src.includes("picsum"))).toBe(true);
+
+  const cover = page.locator('[data-project-row="zens-den"] [data-project-halftone]');
+  await page.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-project-row="zens-den"]');
+    if (!row) return;
+    const top = row.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.16));
+  });
+  await expect(cover).toHaveAttribute("data-halftone-state", "active");
+  const canvas = cover.locator("canvas");
+  await expect(canvas).toBeVisible();
+  const bounds = await canvas.boundingBox();
+  expect(bounds).not.toBeNull();
+  if (bounds) {
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.waitForTimeout(500);
+    await expect(canvas).toBeVisible();
+    await expect(page.locator("[data-target-cursor]")).toHaveAttribute(
+      "data-target-state",
+      "active",
+    );
+    await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+      "border-color",
+      "rgb(180, 151, 207)",
     );
   }
-  await expect(preview).toHaveAttribute("data-preview-active", "zens-den");
-  await expect(preview).toHaveCSS("border-radius", "50%");
-  const previewBounds = await preview.boundingBox();
-  expect(previewBounds).not.toBeNull();
-  if (previewBounds) {
-    expect(Math.abs(previewBounds.width - previewBounds.height)).toBeLessThanOrEqual(1);
-    expect(previewBounds.width).toBeLessThan(300);
-  }
 
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(preview).not.toHaveAttribute("data-preview-active", /.+/);
-  await expect(preview).toBeHidden();
-
-  await row.scrollIntoViewIfNeeded();
-  const restoredBounds = await row.boundingBox();
-  expect(restoredBounds).not.toBeNull();
-  if (restoredBounds) {
-    await page.mouse.move(
-      restoredBounds.x + restoredBounds.width * 0.45,
-      restoredBounds.y + Math.min(restoredBounds.height * 0.4, 80),
-    );
-  }
-  await expect(preview).toHaveAttribute("data-preview-active", "zens-den");
-
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await expect(preview).not.toHaveAttribute("data-preview-active", /.+/);
-  await expect(preview).toBeHidden();
+  await openProject(page, "zens-den");
+  await expect(page.locator('[data-project-panel="zens-den"]')).toBeVisible();
 });
 
 test("desktop projects form a scroll-driven sticky stack", async ({
@@ -307,7 +306,8 @@ test("reduced motion keeps the hero static and inline work usable", async ({
   await expect(visual).toHaveAttribute("data-motion-profile", "static");
   await expect(visual).toHaveAttribute("data-roll-state", "static");
   await expect(visual).toHaveAttribute("data-pointer-state", "disabled");
-  await expect(page.locator(".custom-cursor")).toBeHidden();
+  await expect(page.locator("[data-target-cursor]")).toHaveCount(0);
+  await expect(page.locator("body")).not.toHaveClass(/target-cursor-active/);
   const reducedName = page.locator(".hero__title-name");
   await expect(reducedName).toHaveAttribute("data-color-reveal", "disabled");
   expect(
@@ -645,13 +645,24 @@ test("mobile keeps direct navigation, removes the cursor, and expands in place",
   test.skip(testInfo.project.name !== "mobile-chromium");
   await page.goto("/?webgl-off#selected-work");
   await waitForExperience(page);
-  await expect(page.locator(".custom-cursor")).toBeHidden();
+  await expect(page.locator("[data-target-cursor]")).toHaveCount(0);
+  await expect(page.locator("body")).not.toHaveClass(/target-cursor-active/);
   await expect(page.locator('[data-scroll-nav="work"]')).toBeVisible();
   await expect(page.locator('[data-scroll-nav="services"]')).toBeVisible();
   await expect(page.locator('[data-scroll-nav="info"]')).toBeVisible();
   await expect(page.getByRole("link", { name: /WhatsApp/i }).first()).toBeVisible();
   await openProject(page, "north-co");
   await expect(page.locator('[data-project-panel="north-co"]')).toBeVisible();
+});
+
+test("coarse pointers keep all project covers as static original images", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium");
+  await page.goto("/#selected-work");
+  await waitForExperience(page);
+
+  await expect(page.locator('[data-project-halftone][data-halftone-state="fallback"]')).toHaveCount(7);
+  await expect(page.locator("[data-project-halftone] img")).toHaveCount(7);
+  await expect(page.locator("[data-project-halftone] canvas")).toHaveCount(0);
 });
 
 test("supported viewport matrix has no horizontal overflow with a study open", async ({ page }, testInfo) => {
@@ -755,32 +766,120 @@ test("supported viewport matrix has no horizontal overflow with a study open", a
   }
 });
 
-test("fine-pointer cursor continues settling and uses declarative states", async ({ page }, testInfo) => {
+test("fine-pointer target cursor stays responsive and frames logical targets", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium");
   await page.goto("/?webgl-off#selected-work");
   await waitForExperience(page);
+
+  const cursor = page.locator("[data-target-cursor]");
+  await expect(cursor).toHaveCount(1);
+  await expect(cursor).toBeAttached();
+  await expect(cursor.locator(".target-cursor-dot")).toBeVisible();
+  await expect(page.locator("body")).toHaveClass(/target-cursor-active/);
+  expect(
+    await page.locator("body").evaluate((element) => getComputedStyle(element).cursor),
+  ).toBe("none");
+  expect(
+    await page
+      .locator('[data-scroll-nav="work"]')
+      .evaluate((element) => getComputedStyle(element).cursor),
+  ).toBe("none");
+  await expect(page.locator(".project-row__summary.cursor-target")).toHaveCount(
+    projectSlugs.length,
+  );
+  await expect(page.locator(".cursor-target .cursor-target")).toHaveCount(0);
 
   await page.mouse.move(80, 120);
   await page.waitForTimeout(30);
   await page.mouse.move(900, 420);
   await page.waitForTimeout(25);
-  const first = await page.locator(".custom-cursor").evaluate((element) => {
+  const first = await cursor.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
   });
-  await page.waitForTimeout(160);
-  const settled = await page.locator(".custom-cursor").evaluate((element) => {
+  expect(Math.abs(900 - first.x)).toBeLessThan(260);
+  expect(Math.abs(420 - first.y)).toBeLessThan(120);
+  await page.waitForTimeout(120);
+  const settled = await cursor.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2, transform: getComputedStyle(element).transform };
   });
-  expect(Math.abs(900 - settled.x)).toBeLessThan(Math.abs(900 - first.x));
-  expect(Math.abs(420 - settled.y)).toBeLessThan(Math.abs(420 - first.y));
+  expect(Math.abs(900 - settled.x)).toBeLessThanOrEqual(Math.abs(900 - first.x));
+  expect(Math.abs(420 - settled.y)).toBeLessThanOrEqual(Math.abs(420 - first.y));
+  expect(Math.abs(900 - settled.x)).toBeLessThan(1);
+  expect(Math.abs(420 - settled.y)).toBeLessThan(1);
   expect(settled.transform).not.toContain("NaN");
+  await expect(cursor).toHaveCSS("mix-blend-mode", "difference");
 
-  await page.locator('[data-project-expand="crav"]').hover();
-  await expect(page.locator(".custom-cursor")).toHaveAttribute("data-state", "project");
-  await page.getByRole("link", { name: /WhatsApp/i }).first().hover();
-  await expect(page.locator(".custom-cursor")).toHaveAttribute("data-state", "whatsapp");
+  const pointerHotPathMs = await page.evaluate(() => {
+    const startedAt = performance.now();
+    for (let index = 0; index < 240; index += 1) {
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: 100 + (index % 100) * 10,
+          clientY: 100 + (index % 50) * 8,
+        }),
+      );
+    }
+    return performance.now() - startedAt;
+  });
+  expect(pointerHotPathMs).toBeLessThan(50);
+
+  const workLink = page.locator('[data-scroll-nav="work"]');
+  await workLink.hover();
+  await expect(cursor).toHaveAttribute("data-target-state", "active");
+  await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+    "border-color",
+    "rgb(180, 151, 207)",
+  );
+  const frame = await page.evaluate(() => {
+    const target = document.querySelector<HTMLElement>('[data-scroll-nav="work"]')!;
+    const corners = Array.from(
+      document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+    );
+    const targetBounds = target.getBoundingClientRect();
+    const cornerBounds = corners.map((corner) => corner.getBoundingClientRect());
+    return {
+      target: {
+        left: targetBounds.left,
+        top: targetBounds.top,
+        right: targetBounds.right,
+        bottom: targetBounds.bottom,
+      },
+      tl: {
+        left: cornerBounds[0].left,
+        top: cornerBounds[0].top,
+      },
+      br: {
+        right: cornerBounds[2].right,
+        bottom: cornerBounds[2].bottom,
+      },
+    };
+  });
+  expect(frame.tl.left).toBeLessThanOrEqual(frame.target.left + 4);
+  expect(frame.tl.top).toBeLessThanOrEqual(frame.target.top + 4);
+  expect(frame.br.right).toBeGreaterThanOrEqual(frame.target.right - 4);
+  expect(frame.br.bottom).toBeGreaterThanOrEqual(frame.target.bottom - 4);
+
+  const readRotation = () =>
+    cursor.evaluate((element) => {
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+      return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+    });
+  const pausedRotation = await readRotation();
+  await page.waitForTimeout(260);
+  expect(Math.abs((await readRotation()) - pausedRotation)).toBeLessThan(0.5);
+
+  await page.locator(".section-heading--work").hover();
+  await expect(cursor).toHaveAttribute("data-target-state", "idle");
+  await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+    "border-color",
+    "rgb(255, 255, 255)",
+  );
+  await page.waitForTimeout(120);
+  const resumedRotation = await readRotation();
+  await page.waitForTimeout(220);
+  expect(Math.abs((await readRotation()) - resumedRotation)).toBeGreaterThan(4);
 });
 
 test("modified same-page clicks preserve the browser's new-tab behavior", async ({ page }, testInfo) => {

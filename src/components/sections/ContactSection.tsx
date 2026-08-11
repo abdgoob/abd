@@ -10,10 +10,9 @@ export function ContactSection() {
         {site.whatsappUrl ? (
           <a
             href={site.whatsappUrl}
+            className="cursor-target"
             target="_blank"
             rel="noopener noreferrer"
-            data-cursor="whatsapp"
-            data-cursor-label="Open ↗"
           >
             {contact.ctaLabel} <span aria-hidden="true">↗</span>
           </a>
@@ -21,9 +20,9 @@ export function ContactSection() {
       </div>
       {site.email || site.linkedinUrl ? (
         <div className="contact-section__secondary">
-          {site.email ? <a href={`mailto:${site.email}`}>Email</a> : null}
+          {site.email ? <a className="cursor-target" href={`mailto:${site.email}`}>Email</a> : null}
           {site.linkedinUrl ? (
-            <a href={site.linkedinUrl} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+            <a className="cursor-target" href={site.linkedinUrl} target="_blank" rel="noopener noreferrer">LinkedIn</a>
           ) : null}
         </div>
       ) : null}

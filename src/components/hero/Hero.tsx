@@ -41,15 +41,14 @@ export function Hero() {
           {site.whatsappUrl ? (
             <a
               href={site.whatsappUrl}
+              className="cursor-target"
               target="_blank"
               rel="noopener noreferrer"
-              data-cursor="whatsapp"
-              data-cursor-label="Open ↗"
             >
               WhatsApp me <span aria-hidden="true">↗</span>
             </a>
           ) : null}
-          <a href="#selected-work" data-cursor="link">
+          <a className="cursor-target" href="#selected-work">
             View selected work <span aria-hidden="true">↓</span>
           </a>
         </div>

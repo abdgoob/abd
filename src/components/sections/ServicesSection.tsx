@@ -23,10 +23,9 @@ export function ServicesSection() {
             {site.whatsappUrl ? (
               <a
                 href={site.whatsappUrl}
+                className="cursor-target"
                 target="_blank"
                 rel="noopener noreferrer"
-                data-cursor="whatsapp"
-                data-cursor-label="Open ↗"
               >
                 {service.ctaLabel} <span aria-hidden="true">↗</span>
               </a>

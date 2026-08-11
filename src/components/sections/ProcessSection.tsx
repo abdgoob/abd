@@ -25,12 +25,10 @@ export function ProcessSection() {
       </ol>
       {site.whatsappUrl ? (
         <a
-          className="section-cta"
+          className="section-cta cursor-target"
           href={site.whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
-          data-cursor="whatsapp"
-          data-cursor-label="Open ↗"
         >
           Start a project <span aria-hidden="true">↗</span>
         </a>

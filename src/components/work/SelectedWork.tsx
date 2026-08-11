@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import type { Project, ProjectSlug } from "@/data/types";
 import { getGsap } from "@/lib/gsap";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { ProjectHalftoneMedia } from "@/components/work/ProjectHalftoneMedia";
 
 type SelectedWorkProps = {
   items: readonly Project[];
@@ -20,18 +21,12 @@ function notifyLayoutChange() {
 
 export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
   const rootRef = useRef<HTMLElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
   const panelsRef = useRef(new Map<ProjectSlug, HTMLDivElement>());
   const buttonsRef = useRef(new Map<ProjectSlug, HTMLButtonElement>());
   const rowsRef = useRef(new Map<ProjectSlug, HTMLElement>());
   const activeSlug = useRef<ProjectSlug | null>(null);
   const requestedSlug = useRef<ProjectSlug | null>(null);
   const timelineRef = useRef<KillableTimeline | null>(null);
-  const activePreview = useRef<HTMLElement | null>(null);
-  const quickX = useRef<((value: number) => void) | null>(null);
-  const quickY = useRef<((value: number) => void) | null>(null);
-  const quickRotate = useRef<((value: number) => void) | null>(null);
-  const lastPointer = useRef({ x: 0, y: 0, time: 0 });
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -197,131 +192,12 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     if (activeSlug.current === slug) collapse(slug, true);
   };
 
-  const handlePreviewEnter = (slug: ProjectSlug, event: ReactPointerEvent<HTMLElement>) => {
-    if (reducedMotion || !window.matchMedia("(pointer: fine)").matches) return;
-    const preview = previewRef.current;
-    const next = preview?.querySelector<HTMLElement>(`[data-preview-image="${slug}"]`);
-    if (!preview || !next) return;
-
-    const { gsap } = getGsap();
-    if (activePreview.current && activePreview.current !== next) {
-      gsap.to(activePreview.current, { opacity: 0, scale: 0.94, duration: 0.24, overwrite: true });
-    }
-    activePreview.current = next;
-    preview.dataset.previewActive = slug;
-    gsap.set(preview, { x: event.clientX, y: event.clientY, xPercent: -50, yPercent: -50 });
-    lastPointer.current = {
-      x: event.clientX,
-      y: event.clientY,
-      time: event.timeStamp,
-    };
-    quickX.current = gsap.quickTo(preview, "x", { duration: 0.48, ease: "power3.out" });
-    quickY.current = gsap.quickTo(preview, "y", { duration: 0.48, ease: "power3.out" });
-    quickRotate.current = gsap.quickTo(preview, "rotation", { duration: 0.42, ease: "power3.out" });
-    gsap.fromTo(
-      next,
-      { opacity: 0, scale: 0.82, clipPath: "circle(12% at 50% 50%)" },
-      { opacity: 1, scale: 1, clipPath: "circle(71% at 50% 50%)", duration: 0.48, ease: "power3.out", overwrite: true },
-    );
-    window.dispatchEvent(
-      new CustomEvent("portfolio:project-hover", { detail: { active: true, slug } }),
-    );
-  };
-
-  const handlePreviewLeave = useCallback(() => {
-    const preview = previewRef.current;
-    if (!preview || !activePreview.current) return;
-    const { gsap } = getGsap();
-    gsap.to(activePreview.current, {
-      opacity: 0,
-      scale: 0.94,
-      rotation: 0,
-      duration: 0.32,
-      ease: "power3.out",
-      overwrite: true,
-    });
-    delete preview.dataset.previewActive;
-    activePreview.current = null;
-    quickX.current = null;
-    quickY.current = null;
-    quickRotate.current = null;
-    window.dispatchEvent(
-      new CustomEvent("portfolio:project-hover", { detail: { active: false } }),
-    );
-  }, []);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    let checkFrame = 0;
-    const dismissOutsideProjectRow = () => {
-      checkFrame = 0;
-      const preview = previewRef.current;
-      if (!preview || !activePreview.current) return;
-
-      const { x, y } = lastPointer.current;
-      const rootBounds = root.getBoundingClientRect();
-      const hovered = document.elementFromPoint(x, y);
-      const row = hovered?.closest<HTMLElement>("[data-project-row]");
-      const rowSlug = row?.dataset.projectRow;
-      const insideRoot =
-        x >= rootBounds.left &&
-        x <= rootBounds.right &&
-        y >= rootBounds.top &&
-        y <= rootBounds.bottom;
-
-      if (
-        !insideRoot ||
-        !row ||
-        !root.contains(row) ||
-        rowSlug !== preview.dataset.previewActive
-      ) {
-        handlePreviewLeave();
-      }
-    };
-    const scheduleCheck = () => {
-      if (!activePreview.current || checkFrame) return;
-      checkFrame = window.requestAnimationFrame(dismissOutsideProjectRow);
-    };
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) handlePreviewLeave();
-      },
-      { threshold: 0 },
-    );
-
-    observer.observe(root);
-    window.addEventListener("scroll", scheduleCheck, { passive: true });
-    window.addEventListener("resize", scheduleCheck, { passive: true });
-
-    return () => {
-      observer.disconnect();
-      window.cancelAnimationFrame(checkFrame);
-      window.removeEventListener("scroll", scheduleCheck);
-      window.removeEventListener("resize", scheduleCheck);
-    };
-  }, [handlePreviewLeave]);
-
-  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!activePreview.current) return;
-    const now = event.timeStamp;
-    const elapsed = Math.max(16, now - lastPointer.current.time);
-    const velocity = (event.clientX - lastPointer.current.x) / elapsed;
-    lastPointer.current = { x: event.clientX, y: event.clientY, time: now };
-    quickX.current?.(event.clientX);
-    quickY.current?.(event.clientY);
-    quickRotate.current?.(Math.max(-4, Math.min(4, velocity * 3.4)));
-  };
-
   return (
     <section
       id="selected-work"
       className="selected-work"
       aria-labelledby="selected-work-title"
       ref={rootRef}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePreviewLeave}
     >
       <div className="section-heading section-heading--work">
         <p>Selected work</p>
@@ -357,9 +233,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
               ref={(node) => {
                 if (node) rowsRef.current.set(project.slug, node);
               }}
-              onPointerEnter={(event) => handlePreviewEnter(project.slug, event)}
             >
-              <div className="project-row__summary">
+              <div className="project-row__summary cursor-target">
                 <span className="project-row__index">{String(projectIndex + 1).padStart(2, "0")}</span>
                 <div className="project-row__identity">
                   <h3 id={headingId} className="project-row__title">
@@ -376,8 +251,6 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                     aria-expanded="false"
                     aria-controls={panelId}
                     data-project-expand={project.slug}
-                    data-cursor="project"
-                    data-cursor-label="Explore"
                     ref={(node) => {
                       if (node) buttonsRef.current.set(project.slug, node);
                     }}
@@ -391,15 +264,13 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       data-project-contact={project.slug}
-                      data-cursor="whatsapp"
-                      data-cursor-label="Open ↗"
                     >
                       Start something similar <span aria-hidden="true">↗</span>
                     </a>
                   ) : null}
                 </div>
                 <figure className="project-row__cover" aria-hidden="true">
-                  <Image
+                  <ProjectHalftoneMedia
                     src={project.cover.src}
                     alt=""
                     width={project.cover.width}
@@ -498,8 +369,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                   <div className="project-inline__footer" data-project-detail-part>
                     <button
                       type="button"
+                      className="cursor-target"
                       data-project-collapse={project.slug}
-                      data-cursor="navigation"
                       onClick={() => requestClose(project.slug)}
                     >
                       Back to work <span aria-hidden="true">↑</span>
@@ -508,11 +379,10 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                       {project.liveUrl ? (
                         <a
                           href={project.liveUrl}
+                          className="cursor-target"
                           target="_blank"
                           rel="noopener noreferrer"
                           data-project-live={project.slug}
-                          data-cursor="project-live"
-                          data-cursor-label="Live ↗"
                         >
                           View live site <span aria-hidden="true">↗</span>
                         </a>
@@ -520,11 +390,10 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                       {whatsappUrl ? (
                         <a
                           href={whatsappUrl}
+                          className="cursor-target"
                           target="_blank"
                           rel="noopener noreferrer"
                           data-project-contact={project.slug}
-                          data-cursor="whatsapp"
-                          data-cursor-label="Open ↗"
                         >
                           {project.contactLabel} <span aria-hidden="true">↗</span>
                         </a>
@@ -536,20 +405,6 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
             </article>
           );
         })}
-      </div>
-
-      <div className="project-hover-preview" ref={previewRef} aria-hidden="true" data-hover-preview>
-        {items.map((project) => (
-          <span key={project.slug} data-preview-image={project.slug}>
-            <Image
-              src={project.cover.src}
-              alt=""
-              width={project.cover.width}
-              height={project.cover.height}
-              sizes="32vw"
-            />
-          </span>
-        ))}
       </div>
     </section>
   );

@@ -14,10 +14,9 @@ export function AboutSection() {
           {site.whatsappUrl ? (
             <a
               href={site.whatsappUrl}
+              className="cursor-target"
               target="_blank"
               rel="noopener noreferrer"
-              data-cursor="whatsapp"
-              data-cursor-label="Open ↗"
             >
               {about.ctaLabel} <span aria-hidden="true">↗</span>
             </a>

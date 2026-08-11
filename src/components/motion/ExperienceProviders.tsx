@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AnchorNavigation } from "./AnchorNavigation";
 import { SmoothScroll } from "./SmoothScroll";
 import { PageLoader } from "./PageLoader";
-import { CustomCursor } from "./CustomCursor";
+import { PortfolioCursor } from "./PortfolioCursor";
 import { ScrollMotion } from "./ScrollMotion";
 
 export function ExperienceProviders({ children }: { children: ReactNode }) {
@@ -13,7 +13,7 @@ export function ExperienceProviders({ children }: { children: ReactNode }) {
       <AnchorNavigation />
       <SmoothScroll />
       <PageLoader />
-      <CustomCursor />
+      <PortfolioCursor />
       <ScrollMotion />
       {children}
     </>
