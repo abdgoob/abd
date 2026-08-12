@@ -16,14 +16,13 @@ export function ServicesSection() {
       </div>
       <div className="service-list">
         {services.map((service) => (
-          <article className="service-row" key={service.index} data-service-item>
+          <article className="service-row cursor-target" key={service.index} data-service-item>
             <span>{service.index}</span>
             <h3>{service.title}</h3>
             <p>{service.description}</p>
             {site.whatsappUrl ? (
               <a
                 href={site.whatsappUrl}
-                className="cursor-target"
                 target="_blank"
                 rel="noopener noreferrer"
               >

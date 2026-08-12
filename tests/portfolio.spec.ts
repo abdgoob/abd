@@ -110,6 +110,9 @@ test("all seven inline studies expose the requested capability systems", async (
   for (const slug of projectSlugs) {
     const panel = await openProject(page, slug);
     await expect(panel.locator("[data-project-capability]")).toHaveCount(capabilityCounts[slug]);
+    await expect(
+      panel.locator("[data-project-capability].cursor-target"),
+    ).toHaveCount(capabilityCounts[slug]);
     await expect(page.locator("body")).toHaveAttribute("data-expanded-project", slug);
     await expect(page.locator('[data-expansion-state="open"]')).toHaveCount(1);
   }
@@ -136,6 +139,55 @@ test("rapid project requests settle on the latest study", async ({ page }, testI
   await expect(page.locator('[data-expansion-state="open"]')).toHaveCount(1);
 });
 
+test("other cards and Halftone cover actions remain accessible while a project is open", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/#selected-work");
+  await waitForExperience(page);
+  await openProject(page, "zens-den");
+
+  const siblingRows = page.locator('[data-project-row]:not([data-project-row="zens-den"])');
+  await expect(siblingRows).toHaveCount(projectSlugs.length - 1);
+  await expect(page.locator('[data-project-row="crav"]')).not.toHaveAttribute(
+    "data-project-dimmed",
+    "true",
+  );
+  await expect(
+    page.locator('[data-project-row="crav"] .project-row__summary'),
+  ).toHaveCSS("opacity", "1");
+
+  for (const slug of projectSlugs) {
+    const coverAction = page.locator(
+      slug === "crav"
+        ? `[data-project-card-live="${slug}"]`
+        : `[data-project-card-expand="${slug}"]`,
+    );
+    await expect(coverAction).toBeVisible();
+    await expect(coverAction.locator("[data-project-halftone]")).toBeVisible();
+  }
+
+  const nextCover = page.locator('[data-project-card-expand="north-co"]');
+  await nextCover.evaluate((element) => {
+    element.scrollIntoView({ block: "center" });
+  });
+  await page.waitForTimeout(500);
+  await nextCover.click();
+  await expect(page.locator('[data-project-panel="zens-den"]')).toHaveAttribute(
+    "data-expansion-state",
+    "closed",
+  );
+  await expect(page.locator('[data-project-panel="north-co"]')).toHaveAttribute(
+    "data-expansion-state",
+    "open",
+  );
+  await expect(page.locator("body")).toHaveAttribute(
+    "data-expanded-project",
+    "north-co",
+  );
+  await expect(nextCover).toHaveAttribute("aria-expanded", "true");
+});
+
 test("CRAV live site and every project contact CTA are external and exact", async ({ page }) => {
   await page.goto("/?webgl-off");
   await waitForExperience(page);
@@ -145,6 +197,25 @@ test("CRAV live site and every project contact CTA are external and exact", asyn
     "https://www.cravburgers.shop/",
   );
   await expect(page.locator("[data-project-live]")).toHaveCount(1);
+  await expectExternal(
+    page.locator('[data-project-card-live="crav"]'),
+    "https://www.cravburgers.shop/",
+  );
+  await expect(page.locator('[data-project-card-live="crav"]')).toContainText(
+    "Visit cravburgers.shop",
+  );
+  await expect(page.locator("[data-project-card-live]")).toHaveCount(1);
+  await expect(page.locator("[data-project-card-expand]")).toHaveCount(
+    projectSlugs.length - 1,
+  );
+  for (const slug of projectSlugs.filter((slug) => slug !== "crav")) {
+    const coverAction = page.locator(`[data-project-card-expand="${slug}"]`);
+    await expect(coverAction).toContainText("Explore project");
+    await expect(coverAction).toHaveAttribute(
+      "aria-controls",
+      `project-panel-${slug}`,
+    );
+  }
 
   for (const slug of projectSlugs) {
     const links = page.locator(`[data-project-contact="${slug}"]`);
@@ -243,16 +314,87 @@ test("every project cover uses its own viewport-scoped halftone reveal", async (
     await expect(canvas).toBeVisible();
     await expect(page.locator("[data-target-cursor]")).toHaveAttribute(
       "data-target-state",
-      "active",
+      "idle",
     );
     await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
       "border-color",
-      "rgb(180, 151, 207)",
+      "rgb(255, 255, 255)",
+    );
+    await page.evaluate(() => window.scrollBy(0, 24));
+    await page.waitForTimeout(260);
+    await expect(canvas).toBeVisible();
+    await expect(page.locator("[data-target-cursor]")).toHaveAttribute(
+      "data-target-state",
+      "idle",
     );
   }
 
   await openProject(page, "zens-den");
   await expect(page.locator('[data-project-panel="zens-den"]')).toBeVisible();
+});
+
+test("CRAV halftone cover opens the live site from the image", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.context().route("https://www.cravburgers.shop/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>CRAV Burgers</title>",
+    });
+  });
+  await page.goto("/#selected-work");
+  await waitForExperience(page);
+
+  const cover = page.locator('[data-project-row="crav"] [data-project-halftone]');
+  await page.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-project-row="crav"]')!;
+    const top = row.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.16));
+  });
+  await expect(cover).toHaveAttribute("data-halftone-state", "active");
+
+  const liveCover = page.locator('[data-project-card-live="crav"]');
+  const canvas = liveCover.locator("canvas");
+  await expect(liveCover).toBeVisible();
+  await expect(canvas).toBeVisible();
+
+  const popupPromise = page.context().waitForEvent("page");
+  await canvas.click({ position: { x: 40, y: 40 } });
+  const popup = await popupPromise;
+  await popup.waitForLoadState("domcontentloaded");
+  await expect(popup).toHaveURL("https://www.cravburgers.shop/");
+  await popup.close();
+});
+
+test("a non-CRAV HalftoneReveal cover opens its inline project", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/#selected-work");
+  await waitForExperience(page);
+
+  const slug = "zens-den";
+  const row = page.locator(`[data-project-row="${slug}"]`);
+  await row.evaluate((element) => {
+    const top = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.16));
+  });
+  await page.waitForTimeout(500);
+
+  const coverAction = page.locator(`[data-project-card-expand="${slug}"]`);
+  const canvas = coverAction.locator("canvas");
+  await expect(coverAction).toBeVisible();
+  await expect(canvas).toBeVisible();
+  await canvas.click({ position: { x: 40, y: 40 } });
+
+  const panel = page.locator(`[data-project-panel="${slug}"]`);
+  await expect(panel).toHaveAttribute("data-expansion-state", "open");
+  await expect(page.locator("body")).toHaveAttribute(
+    "data-expanded-project",
+    slug,
+  );
 });
 
 test("desktop projects form a scroll-driven sticky stack", async ({
@@ -784,9 +926,10 @@ test("fine-pointer target cursor stays responsive and frames logical targets", a
       .locator('[data-scroll-nav="work"]')
       .evaluate((element) => getComputedStyle(element).cursor),
   ).toBe("none");
-  await expect(page.locator(".project-row__summary.cursor-target")).toHaveCount(
-    projectSlugs.length,
-  );
+  await expect(page.locator(".project-row__summary.cursor-target")).toHaveCount(0);
+  await expect(page.locator(".service-row.cursor-target")).toHaveCount(5);
+  await expect(page.locator(".process-row.cursor-target")).toHaveCount(4);
+  await expect(page.locator(".service-row .cursor-target")).toHaveCount(0);
   await expect(page.locator(".cursor-target .cursor-target")).toHaveCount(0);
 
   await page.mouse.move(80, 120);
@@ -811,6 +954,89 @@ test("fine-pointer target cursor stays responsive and frames logical targets", a
   expect(settled.transform).not.toContain("NaN");
   await expect(cursor).toHaveCSS("mix-blend-mode", "difference");
 
+  await page.locator(".section-heading--work").hover();
+  await expect(cursor).toHaveAttribute("data-target-state", "idle");
+  await page.waitForTimeout(240);
+  const cornerTrajectory = await page.evaluate(async () => {
+    const cursorElement = document.querySelector<HTMLElement>("[data-target-cursor]")!;
+    const target = document.querySelector<HTMLElement>(".service-row")!;
+    const idleSurface = document.querySelector<HTMLElement>(".section-heading--work")!;
+    const corners = Array.from(
+      document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+    );
+    const sleep = (duration: number) =>
+      new Promise((resolve) => window.setTimeout(resolve, duration));
+    const readCorners = () =>
+      corners.map((corner) => {
+        const bounds = corner.getBoundingClientRect();
+        return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+      });
+    const readExtent = (positions: ReturnType<typeof readCorners>) => ({
+      width: Math.max(...positions.map((position) => position.right)) -
+        Math.min(...positions.map((position) => position.left)),
+      height: Math.max(...positions.map((position) => position.bottom)) -
+        Math.min(...positions.map((position) => position.top)),
+    });
+    const distance = (
+      from: { left: number; top: number },
+      to: { left: number; top: number },
+    ) => Math.hypot(from.left - to.left, from.top - to.top);
+
+    const targetBounds = target.getBoundingClientRect();
+    const expected = [
+      { left: targetBounds.left - 3, top: targetBounds.top - 3 },
+      { left: targetBounds.right + 3 - 12, top: targetBounds.top - 3 },
+      { left: targetBounds.right + 3 - 12, top: targetBounds.bottom + 3 - 12 },
+      { left: targetBounds.left - 3, top: targetBounds.bottom + 3 - 12 },
+    ];
+    const start = readCorners();
+    target.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    await sleep(65);
+    const middle = readCorners();
+    await sleep(210);
+    const end = readCorners();
+    const activeExtent = readExtent(end);
+
+    target.dispatchEvent(
+      new PointerEvent("pointerout", {
+        bubbles: true,
+        relatedTarget: idleSurface,
+      }),
+    );
+    await sleep(65);
+    const collapsingExtent = readExtent(readCorners());
+    await sleep(210);
+    const collapsedExtent = readExtent(readCorners());
+
+    return {
+      state: cursorElement.dataset.targetState,
+      corners: expected.map((destination, index) => ({
+        total: distance(start[index], destination),
+        travelled: distance(start[index], middle[index]),
+        remaining: distance(middle[index], destination),
+        final: distance(end[index], destination),
+      })),
+      activeExtent,
+      collapsingExtent,
+      collapsedExtent,
+    };
+  });
+  expect(cornerTrajectory.state).toBe("idle");
+  for (const corner of cornerTrajectory.corners) {
+    expect(corner.total).toBeGreaterThan(40);
+    expect(corner.travelled).toBeGreaterThan(8);
+    expect(corner.remaining).toBeLessThan(corner.total * 0.75);
+    expect(corner.final).toBeLessThan(6);
+  }
+  expect(cornerTrajectory.collapsingExtent.width).toBeLessThan(
+    cornerTrajectory.activeExtent.width,
+  );
+  expect(cornerTrajectory.collapsingExtent.height).toBeLessThan(
+    cornerTrajectory.activeExtent.height,
+  );
+  expect(cornerTrajectory.collapsedExtent.width).toBeLessThan(55);
+  expect(cornerTrajectory.collapsedExtent.height).toBeLessThan(55);
+
   const pointerHotPathMs = await page.evaluate(() => {
     const startedAt = performance.now();
     for (let index = 0; index < 240; index += 1) {
@@ -832,6 +1058,7 @@ test("fine-pointer target cursor stays responsive and frames logical targets", a
     "border-color",
     "rgb(180, 151, 207)",
   );
+  await page.waitForTimeout(100);
   const frame = await page.evaluate(() => {
     const target = document.querySelector<HTMLElement>('[data-scroll-nav="work"]')!;
     const corners = Array.from(
@@ -861,6 +1088,37 @@ test("fine-pointer target cursor stays responsive and frames logical targets", a
   expect(frame.br.right).toBeGreaterThanOrEqual(frame.target.right - 4);
   expect(frame.br.bottom).toBeGreaterThanOrEqual(frame.target.bottom - 4);
 
+  await page.evaluate(() => {
+    const trackedWindow = window as typeof window & {
+      __targetCursorObserver?: MutationObserver;
+      __targetCursorStateChanges?: (string | null)[];
+    };
+    const cursorElement = document.querySelector<HTMLElement>("[data-target-cursor]")!;
+    trackedWindow.__targetCursorStateChanges = [];
+    trackedWindow.__targetCursorObserver = new MutationObserver((records) => {
+      records.forEach((record) => {
+        trackedWindow.__targetCursorStateChanges!.push(record.oldValue);
+      });
+    });
+    trackedWindow.__targetCursorObserver.observe(cursorElement, {
+      attributes: true,
+      attributeFilter: ["data-target-state"],
+      attributeOldValue: true,
+    });
+  });
+  await page.locator('[data-scroll-nav="services"]').hover();
+  await expect(cursor).toHaveAttribute("data-target-state", "active");
+  await page.waitForTimeout(240);
+  const handoffStates = await page.evaluate(() => {
+    const trackedWindow = window as typeof window & {
+      __targetCursorObserver?: MutationObserver;
+      __targetCursorStateChanges?: (string | null)[];
+    };
+    trackedWindow.__targetCursorObserver?.disconnect();
+    return trackedWindow.__targetCursorStateChanges ?? [];
+  });
+  expect(handoffStates).not.toContain("idle");
+
   const readRotation = () =>
     cursor.evaluate((element) => {
       const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
@@ -880,6 +1138,182 @@ test("fine-pointer target cursor stays responsive and frames logical targets", a
   const resumedRotation = await readRotation();
   await page.waitForTimeout(220);
   expect(Math.abs((await readRotation()) - resumedRotation)).toBeGreaterThan(4);
+});
+
+test("real pointer selects service and process rows but not project cards", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/?webgl-off#selected-work");
+  await waitForExperience(page);
+
+  const summary = page.locator('[data-project-row="crav"] .project-row__summary');
+  await page.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-project-row="crav"]')!;
+    const top = row.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - 150));
+  });
+  await page.waitForTimeout(800);
+
+  const bounds = await summary.boundingBox();
+  expect(bounds).not.toBeNull();
+  if (!bounds) return;
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.72,
+    bounds.y + bounds.height * 0.52,
+  );
+  const cursor = page.locator("[data-target-cursor]");
+  await expect(cursor).toHaveAttribute("data-target-state", "idle");
+  await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+    "border-color",
+    "rgb(255, 255, 255)",
+  );
+
+  const expectRowFrame = async (target: Locator) => {
+    await target.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(900);
+    await target.hover();
+    await expect(cursor).toHaveAttribute("data-target-state", "active");
+    await page.waitForTimeout(240);
+
+    const frameError = await target.evaluate((element) => {
+      const corners = Array.from(
+        document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+      );
+      const targetBounds = element.getBoundingClientRect();
+      const cornerBounds = corners.map((corner) => corner.getBoundingClientRect());
+      return Math.max(
+        Math.abs(cornerBounds[0].left - (targetBounds.left - 3)),
+        Math.abs(cornerBounds[0].top - (targetBounds.top - 3)),
+        Math.abs(cornerBounds[2].right - (targetBounds.right + 3)),
+        Math.abs(cornerBounds[2].bottom - (targetBounds.bottom + 3)),
+      );
+    });
+    expect(frameError).toBeLessThan(7);
+  };
+
+  await expectRowFrame(page.locator("[data-service-item]").first());
+  await expectRowFrame(page.locator("[data-process-item]").first());
+  await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+    "border-color",
+    "rgb(180, 151, 207)",
+  );
+});
+
+test("real pointer frames full capability rows in project details", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/?webgl-off#selected-work");
+  await waitForExperience(page);
+
+  const panel = await openProject(page, "north-co");
+  const capability = panel.locator("[data-project-capability]").nth(2);
+  await capability.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+  await capability.hover();
+
+  const cursor = page.locator("[data-target-cursor]");
+  await expect(cursor).toHaveAttribute("data-target-state", "active");
+  await expect(page.locator(".target-cursor-corner").first()).toHaveCSS(
+    "border-color",
+    "rgb(180, 151, 207)",
+  );
+  await page.waitForTimeout(240);
+
+  const frameError = await capability.evaluate((element) => {
+    const corners = Array.from(
+      document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+    );
+    const targetBounds = element.getBoundingClientRect();
+    const cornerBounds = corners.map((corner) => corner.getBoundingClientRect());
+    return Math.max(
+      Math.abs(cornerBounds[0].left - (targetBounds.left - 3)),
+      Math.abs(cornerBounds[0].top - (targetBounds.top - 3)),
+      Math.abs(cornerBounds[2].right - (targetBounds.right + 3)),
+      Math.abs(cornerBounds[2].bottom - (targetBounds.bottom + 3)),
+    );
+  });
+  expect(frameError).toBeLessThan(7);
+  await expect(panel.locator(".cursor-target .cursor-target")).toHaveCount(0);
+});
+
+test("every cursor target receives the four-corner frame", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/?webgl-off");
+  await waitForExperience(page);
+
+  const result = await page.evaluate(async () => {
+    const cursor = document.querySelector<HTMLElement>("[data-target-cursor]")!;
+    const corners = Array.from(
+      document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+    );
+    const targets = Array.from(
+      document.querySelectorAll<HTMLElement>(".cursor-target"),
+    ).filter((target) => target.getClientRects().length > 0);
+    const sleep = (duration: number) =>
+      new Promise((resolve) => window.setTimeout(resolve, duration));
+    const failures: string[] = [];
+
+    for (const [index, target] of targets.entries()) {
+      target.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+      await sleep(240);
+
+      const targetBounds = target.getBoundingClientRect();
+      const cornerBounds = corners.map((corner) => corner.getBoundingClientRect());
+      const error = Math.max(
+        Math.abs(cornerBounds[0].left - (targetBounds.left - 3)),
+        Math.abs(cornerBounds[0].top - (targetBounds.top - 3)),
+        Math.abs(cornerBounds[2].right - (targetBounds.right + 3)),
+        Math.abs(cornerBounds[2].bottom - (targetBounds.bottom + 3)),
+      );
+      if (
+        cursor.dataset.targetState !== "active" ||
+        getComputedStyle(corners[0]).borderColor !== "rgb(180, 151, 207)" ||
+        error > 7
+      ) {
+        failures.push(`${index}:${target.className}:error=${error.toFixed(2)}`);
+      }
+    }
+
+    return { tested: targets.length, failures };
+  });
+
+  expect(result.tested).toBeGreaterThan(15);
+  expect(result.failures).toEqual([]);
+
+  let detailTargetsTested = 0;
+  for (const slug of projectSlugs) {
+    const panel = await openProject(page, slug);
+    const detailTargets = panel.locator(".cursor-target");
+    const detailTargetCount = await detailTargets.count();
+    detailTargetsTested += detailTargetCount;
+
+    for (let index = 0; index < detailTargetCount; index += 1) {
+      const framed = await detailTargets.nth(index).evaluate(async (target) => {
+        target.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+        await new Promise((resolve) => window.setTimeout(resolve, 240));
+        const cursor = document.querySelector<HTMLElement>("[data-target-cursor]")!;
+        const corners = Array.from(
+          document.querySelectorAll<HTMLElement>(".target-cursor-corner"),
+        );
+        const targetBounds = target.getBoundingClientRect();
+        const cornerBounds = corners.map((corner) => corner.getBoundingClientRect());
+        return {
+          state: cursor.dataset.targetState,
+          color: getComputedStyle(corners[0]).borderColor,
+          error: Math.max(
+            Math.abs(cornerBounds[0].left - (targetBounds.left - 3)),
+            Math.abs(cornerBounds[0].top - (targetBounds.top - 3)),
+            Math.abs(cornerBounds[2].right - (targetBounds.right + 3)),
+            Math.abs(cornerBounds[2].bottom - (targetBounds.bottom + 3)),
+          ),
+        };
+      });
+      expect(framed.state).toBe("active");
+      expect(framed.color).toBe("rgb(180, 151, 207)");
+      expect(framed.error).toBeLessThan(7);
+    }
+  }
+  expect(detailTargetsTested).toBeGreaterThanOrEqual(projectSlugs.length * 2);
 });
 
 test("modified same-page clicks preserve the browser's new-tab behavior", async ({ page }, testInfo) => {

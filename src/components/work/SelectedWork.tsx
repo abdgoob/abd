@@ -38,23 +38,20 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
 
   const setRows = (slug: ProjectSlug | null) => {
     rowsRef.current.forEach((row, rowSlug) => {
-      if (slug === null) {
-        delete row.dataset.projectActive;
-        delete row.dataset.projectDimmed;
-      } else if (rowSlug === slug) {
+      if (slug !== null && rowSlug === slug) {
         row.dataset.projectActive = "true";
-        delete row.dataset.projectDimmed;
       } else {
         delete row.dataset.projectActive;
-        row.dataset.projectDimmed = "true";
       }
+      delete row.dataset.projectDimmed;
     });
   };
 
   const finishClosed = (slug: ProjectSlug, restoreFocus: boolean) => {
     const panel = panelsRef.current.get(slug);
     const button = buttonsRef.current.get(slug);
-    if (!panel || !button) return;
+    const row = rowsRef.current.get(slug);
+    if (!panel || !button || !row) return;
 
     panel.hidden = true;
     panel.inert = true;
@@ -63,6 +60,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     panel.style.removeProperty("height");
     panel.style.removeProperty("overflow");
     button.setAttribute("aria-expanded", "false");
+    row
+      .querySelector<HTMLElement>(`[data-project-card-expand="${slug}"]`)
+      ?.setAttribute("aria-expanded", "false");
     if (activeSlug.current === slug) activeSlug.current = null;
     if (document.body.getAttribute("data-expanded-project") === slug) {
       document.body.removeAttribute("data-expanded-project");
@@ -72,13 +72,10 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
 
     if (restoreFocus) {
       button.focus({ preventScroll: true });
-      const row = rowsRef.current.get(slug);
-      if (row) {
-        const top = row.getBoundingClientRect().top + window.scrollY - 82;
-        window.dispatchEvent(
-          new CustomEvent("portfolio:scroll-to", { detail: { top, immediate: reducedMotion } }),
-        );
-      }
+      const top = row.getBoundingClientRect().top + window.scrollY - 82;
+      window.dispatchEvent(
+        new CustomEvent("portfolio:scroll-to", { detail: { top, immediate: reducedMotion } }),
+      );
     }
   };
 
@@ -97,6 +94,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     panel.setAttribute("aria-hidden", "false");
     panel.dataset.expansionState = "opening";
     button.setAttribute("aria-expanded", "true");
+    row
+      .querySelector<HTMLElement>(`[data-project-card-expand="${slug}"]`)
+      ?.setAttribute("aria-expanded", "true");
 
     if (reducedMotion) {
       panel.style.height = "auto";
@@ -221,6 +221,19 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
             "--project-accent": project.palette.accent,
             "--project-stack-offset": `${projectIndex * 0.34}rem`,
           } as CSSProperties;
+          const liveHost = project.liveUrl
+            ? new URL(project.liveUrl).hostname.replace(/^www\./, "")
+            : null;
+          const coverMedia = (
+            <ProjectHalftoneMedia
+              src={project.cover.src}
+              alt=""
+              width={project.cover.width}
+              height={project.cover.height}
+              sizes="(max-width: 767px) 94vw, 28vw"
+              priority={projectIndex === 0}
+            />
+          );
 
           return (
             <article
@@ -234,7 +247,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                 if (node) rowsRef.current.set(project.slug, node);
               }}
             >
-              <div className="project-row__summary cursor-target">
+              <div className="project-row__summary">
                 <span className="project-row__index">{String(projectIndex + 1).padStart(2, "0")}</span>
                 <div className="project-row__identity">
                   <h3 id={headingId} className="project-row__title">
@@ -269,15 +282,37 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                     </a>
                   ) : null}
                 </div>
-                <figure className="project-row__cover" aria-hidden="true">
-                  <ProjectHalftoneMedia
-                    src={project.cover.src}
-                    alt=""
-                    width={project.cover.width}
-                    height={project.cover.height}
-                    sizes="(max-width: 767px) 94vw, 28vw"
-                    priority={projectIndex === 0}
-                  />
+                <figure className="project-row__cover">
+                  {project.liveUrl ? (
+                    <a
+                      className="project-row__cover-action"
+                      href={project.liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Visit ${project.compactTitle} live site`}
+                      data-project-card-live={project.slug}
+                    >
+                      {coverMedia}
+                      <span className="project-row__cover-cta">
+                        Visit {liveHost} <span aria-hidden="true">↗</span>
+                      </span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      className="project-row__cover-action"
+                      aria-label={`Explore ${project.compactTitle} project`}
+                      aria-expanded="false"
+                      aria-controls={panelId}
+                      data-project-card-expand={project.slug}
+                      onClick={() => requestOpen(project.slug)}
+                    >
+                      {coverMedia}
+                      <span className="project-row__cover-cta">
+                        Explore project <span aria-hidden="true">↓</span>
+                      </span>
+                    </button>
+                  )}
                 </figure>
               </div>
 
@@ -325,7 +360,11 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                     <p>What the experience includes</p>
                     <ul>
                       {project.capabilities.map((capability, capabilityIndex) => (
-                        <li key={capability} data-project-capability>
+                        <li
+                          className="cursor-target"
+                          key={capability}
+                          data-project-capability
+                        >
                           <span>{String(capabilityIndex + 1).padStart(2, "0")}</span>
                           <span>{capability}</span>
                         </li>

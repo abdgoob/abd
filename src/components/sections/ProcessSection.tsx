@@ -16,7 +16,7 @@ export function ProcessSection() {
       </div>
       <ol className="process-list">
         {processSteps.map((step) => (
-          <li className="process-row" key={step.index} data-process-item>
+          <li className="process-row cursor-target" key={step.index} data-process-item>
             <span>{step.index}</span>
             <h3>{step.title}</h3>
             <p>{step.body}</p>

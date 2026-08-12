@@ -99,14 +99,16 @@ const TargetCursor = ({
       { x: -constants.cornerSize * 1.5, y: constants.cornerSize * 0.5 },
     ];
     const pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    const activeStrength = { current: 0 };
+    const lockProgress = { current: 0 };
     let containingBlock = getContainingBlock(cursor);
     let containingBlockOffset = getContainingBlockOffset(containingBlock);
     let activeTarget: Element | null = null;
     let targetCornerPositions: { x: number; y: number }[] | null = null;
+    let lockStartPositions: { x: number; y: number }[] | null = null;
     let targetGeometryFrame = 0;
     let resumeTimeout: ReturnType<typeof setTimeout> | null = null;
     let tickerActive = false;
+    let lastTickerTime = performance.now();
 
     gsap.set(cursor, {
       xPercent: -50,
@@ -118,8 +120,8 @@ const TargetCursor = ({
       gsap.set(corner, collapsedPositions[index]);
     });
 
-    // These quickTo functions are created once and reused for every pointer or
-    // ticker update instead of allocating a new tween for every event/frame.
+    // Pointer movement is the hot path, so these setters are created once and
+    // reused. Target locking has its own independent four-corner animation.
     const cursorXTo = gsap.quickTo(cursor, "x", {
       duration: 0.06,
       ease: "power3.out",
@@ -128,18 +130,6 @@ const TargetCursor = ({
       duration: 0.06,
       ease: "power3.out",
     });
-    const cornerXTo = corners.map((corner) =>
-      gsap.quickTo(corner, "x", {
-        duration: parallaxOn ? 0.08 : 0.01,
-        ease: "power1.out",
-      }),
-    );
-    const cornerYTo = corners.map((corner) =>
-      gsap.quickTo(corner, "y", {
-        duration: parallaxOn ? 0.08 : 0.01,
-        ease: "power1.out",
-      }),
-    );
 
     const createSpinTimeline = () => {
       spinTimelineRef.current?.kill();
@@ -153,8 +143,7 @@ const TargetCursor = ({
       containingBlockOffset = getContainingBlockOffset(containingBlock);
     };
 
-    const updateTargetGeometry = () => {
-      targetGeometryFrame = 0;
+    const measureTargetGeometry = () => {
       if (!activeTarget) return;
 
       const rect = activeTarget.getBoundingClientRect();
@@ -177,28 +166,81 @@ const TargetCursor = ({
       ];
     };
 
+    const updateTargetGeometry = () => {
+      targetGeometryFrame = 0;
+      measureTargetGeometry();
+    };
+
     const scheduleTargetGeometry = () => {
       if (!activeTarget || targetGeometryFrame) return;
       targetGeometryFrame = window.requestAnimationFrame(updateTargetGeometry);
     };
 
     const ticker = () => {
+      if (!activeTarget) return;
+      // Project cards are transformed by a scrubbed ScrollTrigger after the
+      // native scroll event has finished, so their live rectangle must be read
+      // on the same ticker that positions the four locked corners.
+      const previousTargetPositions = targetCornerPositions;
+      measureTargetGeometry();
       if (!targetCornerPositions) return;
-
-      const strength = activeStrength.current;
-      if (strength <= 0) return;
 
       const cursorX = gsap.getProperty(cursor, "x") as number;
       const cursorY = gsap.getProperty(cursor, "y") as number;
+      const progress = lockProgress.current;
+      const now = performance.now();
+      const elapsed = Math.min(64, Math.max(1, now - lastTickerTime));
+      lastTickerTime = now;
+      const parallaxStrength = parallaxOn
+        ? 1 - Math.exp(-elapsed / 65)
+        : 1;
 
       corners.forEach((corner, index) => {
-        const currentX = gsap.getProperty(corner, "x") as number;
-        const currentY = gsap.getProperty(corner, "y") as number;
         const targetX = targetCornerPositions![index].x - cursorX;
         const targetY = targetCornerPositions![index].y - cursorY;
-        cornerXTo[index](currentX + (targetX - currentX) * strength);
-        cornerYTo[index](currentY + (targetY - currentY) * strength);
+        let nextX = targetX;
+        let nextY = targetY;
+
+        if (progress < 1 && lockStartPositions) {
+          const start = lockStartPositions[index];
+          nextX =
+            start.x + (targetCornerPositions![index].x - start.x) * progress - cursorX;
+          nextY =
+            start.y + (targetCornerPositions![index].y - start.y) * progress - cursorY;
+        } else if (parallaxOn) {
+          const previousTarget = previousTargetPositions?.[index];
+          const geometryDeltaX = previousTarget
+            ? targetCornerPositions![index].x - previousTarget.x
+            : 0;
+          const geometryDeltaY = previousTarget
+            ? targetCornerPositions![index].y - previousTarget.y
+            : 0;
+          // Keep target-driven motion exact; only pointer motion receives the
+          // subtle parallax lag.
+          const currentX =
+            (gsap.getProperty(corner, "x") as number) + geometryDeltaX;
+          const currentY =
+            (gsap.getProperty(corner, "y") as number) + geometryDeltaY;
+          nextX = currentX + (targetX - currentX) * parallaxStrength;
+          nextY = currentY + (targetY - currentY) * parallaxStrength;
+        }
+
+        gsap.set(corner, { x: nextX, y: nextY });
       });
+    };
+
+    const snapCornersToTarget = () => {
+      if (!targetCornerPositions) return;
+      const cursorX = gsap.getProperty(cursor, "x") as number;
+      const cursorY = gsap.getProperty(cursor, "y") as number;
+      corners.forEach((corner, index) => {
+        gsap.set(corner, {
+          x: targetCornerPositions![index].x - cursorX,
+          y: targetCornerPositions![index].y - cursorY,
+        });
+      });
+      lockStartPositions = null;
+      lastTickerTime = performance.now();
     };
 
     const addTicker = () => {
@@ -221,15 +263,21 @@ const TargetCursor = ({
       }, 50);
     };
 
+    const clearTargetLock = () => {
+      activeTarget = null;
+      targetCornerPositions = null;
+      lockStartPositions = null;
+      removeTicker();
+      gsap.killTweensOf(lockProgress);
+      gsap.set(lockProgress, { current: 0 });
+    };
+
     const leaveTarget = (restartSpin = true) => {
       if (!activeTarget) return;
 
-      activeTarget = null;
-      targetCornerPositions = null;
-      removeTicker();
-      gsap.killTweensOf(activeStrength);
-      gsap.set(activeStrength, { current: 0 });
+      clearTargetLock();
       cursor.dataset.targetState = "idle";
+      gsap.killTweensOf(corners, "x,y");
 
       if (cursorColorOnTarget) {
         gsap.to(corners, {
@@ -246,9 +294,14 @@ const TargetCursor = ({
         });
       }
 
-      corners.forEach((_, index) => {
-        cornerXTo[index](collapsedPositions[index].x);
-        cornerYTo[index](collapsedPositions[index].y);
+      corners.forEach((corner, index) => {
+        gsap.to(corner, {
+          x: collapsedPositions[index].x,
+          y: collapsedPositions[index].y,
+          duration: hoverDuration,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
       });
 
       if (restartSpin) resumeSpin();
@@ -256,7 +309,7 @@ const TargetCursor = ({
 
     const enterTarget = (target: Element) => {
       if (activeTarget === target) return;
-      if (activeTarget) leaveTarget(false);
+      if (activeTarget) clearTargetLock();
       if (resumeTimeout) {
         clearTimeout(resumeTimeout);
         resumeTimeout = null;
@@ -283,17 +336,44 @@ const TargetCursor = ({
         });
       }
 
+      gsap.killTweensOf(corners, "x,y");
       updateTargetGeometry();
-      gsap.killTweensOf(activeStrength);
-      gsap.set(activeStrength, { current: 0 });
-      gsap.to(activeStrength, {
+      const cursorX = gsap.getProperty(cursor, "x") as number;
+      const cursorY = gsap.getProperty(cursor, "y") as number;
+      lockStartPositions = corners.map((corner) => ({
+        x: cursorX + (gsap.getProperty(corner, "x") as number),
+        y: cursorY + (gsap.getProperty(corner, "y") as number),
+      }));
+      lastTickerTime = performance.now();
+      gsap.killTweensOf(lockProgress);
+      gsap.set(lockProgress, { current: 0 });
+      addTicker();
+      ticker();
+      gsap.to(lockProgress, {
         current: 1,
         duration: hoverDuration,
         ease: "power2.out",
         overwrite: true,
+        onUpdate: ticker,
+        onComplete: snapCornersToTarget,
       });
-      addTicker();
-      ticker();
+    };
+
+    const resolveTarget = (node: EventTarget | null): Element | null => {
+      if (!(node instanceof Element)) return null;
+      if (activeTarget?.contains(node)) return activeTarget;
+
+      let target = node.closest(targetSelector);
+      if (!target) return null;
+
+      // Prefer the outer logical target so accidental nested target classes do
+      // not cause the frame to collapse or retarget while traversing children.
+      let parentTarget = target.parentElement?.closest(targetSelector) ?? null;
+      while (parentTarget) {
+        target = parentTarget;
+        parentTarget = target.parentElement?.closest(targetSelector) ?? null;
+      }
+      return target;
     };
 
     const pointerMoveHandler = (event: PointerEvent) => {
@@ -304,7 +384,7 @@ const TargetCursor = ({
     };
 
     const pointerOverHandler = (event: PointerEvent) => {
-      const target = (event.target as Element | null)?.closest(targetSelector);
+      const target = resolveTarget(event.target);
       if (target) enterTarget(target);
     };
 
@@ -312,9 +392,12 @@ const TargetCursor = ({
       if (!activeTarget) return;
       const nextNode = event.relatedTarget;
       if (nextNode instanceof Node && activeTarget.contains(nextNode)) return;
-      const nextTarget =
-        nextNode instanceof Element ? nextNode.closest(targetSelector) : null;
+      const nextTarget = resolveTarget(nextNode);
       if (nextTarget === activeTarget) return;
+      if (nextTarget) {
+        enterTarget(nextTarget);
+        return;
+      }
       leaveTarget();
     };
 
@@ -328,8 +411,10 @@ const TargetCursor = ({
 
       scheduleTargetGeometry();
       const elementUnderPointer = document.elementFromPoint(pointer.x, pointer.y);
-      if (elementUnderPointer?.closest(targetSelector) !== activeTarget) {
-        leaveTarget();
+      const targetUnderPointer = resolveTarget(elementUnderPointer);
+      if (targetUnderPointer !== activeTarget) {
+        if (targetUnderPointer) enterTarget(targetUnderPointer);
+        else leaveTarget();
       }
     };
 
@@ -378,7 +463,7 @@ const TargetCursor = ({
       if (resumeTimeout) clearTimeout(resumeTimeout);
       spinTimelineRef.current?.kill();
       spinTimelineRef.current = null;
-      gsap.killTweensOf([cursor, dot, ...corners, activeStrength]);
+      gsap.killTweensOf([cursor, dot, ...corners, lockProgress]);
       document.body.style.cursor = originalCursor;
       document.body.classList.remove("target-cursor-active");
     };
