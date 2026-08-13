@@ -2,6 +2,7 @@ import type { ProcessStep, ServiceItem, SiteConfig } from "./types";
 
 export const site: SiteConfig = {
   name: "Abdullah",
+  calendlyUrl: "https://calendly.com/availabdullah/30min",
   whatsappUrl: "https://wa.me/923342239574",
   // TODO: Add real values only when supplied by the owner.
   email: null,
@@ -88,6 +89,7 @@ export const contact = {
   kicker: "Have a project in mind?",
   title: "Let's make it impossible to ignore.",
   body:
-    "Share what you're building, what needs to change and where you want the website to take the business. I'll reply directly on WhatsApp.",
-  ctaLabel: "Start a project",
+    "Share what you're building, what needs to change and where you want the website to take the business. Book a focused call or send the details directly on WhatsApp.",
+  primaryCtaLabel: "Book a call",
+  secondaryCtaLabel: "WhatsApp me",
 };

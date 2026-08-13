@@ -21,6 +21,7 @@ const capabilityCounts: Record<(typeof projectSlugs)[number], number> = {
 };
 
 const whatsappUrl = "https://wa.me/923342239574";
+const calendlyUrl = "https://calendly.com/availabdullah/30min";
 
 async function waitForExperience(page: Page) {
   await expect(page.locator(".page-loader")).toBeHidden({ timeout: 9_000 });
@@ -82,6 +83,61 @@ test("homepage is one ordered seven-project experience with honest contact UI", 
   await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
   await expect(page.getByRole("link", { name: "LinkedIn" })).toHaveCount(0);
   expect(await page.locator(`a[href="${whatsappUrl}"]`).count()).toBeGreaterThan(10);
+});
+
+test("final contact gives Calendly priority while keeping WhatsApp easy to reach", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?webgl-off#contact");
+  await waitForExperience(page);
+
+  const contact = page.locator("#contact");
+  const actions = contact.locator(".contact-section__actions");
+  const bookCall = contact.locator('[data-contact-action="calendly"]');
+  const whatsapp = contact.locator('[data-contact-action="whatsapp"]');
+
+  await expect(contact.getByRole("heading", { level: 2 })).toHaveText("Let's make it impossible to ignore.");
+  await expect(actions.getByRole("link")).toHaveCount(2);
+  await expectExternal(bookCall, calendlyUrl);
+  await expectExternal(whatsapp, whatsappUrl);
+  await expect(bookCall).toHaveText(/Book a call\s*↗/i);
+  await expect(whatsapp).toHaveText(/WhatsApp me\s*↗/i);
+
+  const geometry = await contact.evaluate((section) => {
+    const copy = section.querySelector<HTMLElement>(".contact-section__footer > p")!;
+    const actionGroup = section.querySelector<HTMLElement>(".contact-section__actions")!;
+    const actionLinks = Array.from(
+      section.querySelectorAll<HTMLElement>(".contact-section__action"),
+    );
+    const copyBounds = copy.getBoundingClientRect();
+    const groupBounds = actionGroup.getBoundingClientRect();
+
+    return {
+      copyRight: copyBounds.right,
+      copyBottom: copyBounds.bottom,
+      groupLeft: groupBounds.left,
+      groupTop: groupBounds.top,
+      groupWidth: groupBounds.width,
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      actionWidths: actionLinks.map((link) => link.getBoundingClientRect().width),
+      actionHeights: actionLinks.map((link) => link.getBoundingClientRect().height),
+      actionOpacities: actionLinks.map((link) => Number.parseFloat(getComputedStyle(link).opacity)),
+    };
+  });
+
+  expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(Math.min(...geometry.actionHeights)).toBeGreaterThanOrEqual(60);
+  expect(geometry.actionOpacities[0]).toBeGreaterThan(geometry.actionOpacities[1]);
+
+  if (testInfo.project.name === "mobile-chromium") {
+    expect(geometry.groupTop).toBeGreaterThan(geometry.copyBottom);
+    for (const width of geometry.actionWidths) {
+      expect(Math.abs(width - geometry.groupWidth)).toBeLessThanOrEqual(1);
+    }
+  } else {
+    expect(geometry.groupLeft).toBeGreaterThan(geometry.copyRight);
+  }
 });
 
 test("first and last case studies expand inline without changing route", async ({ page }) => {
@@ -662,7 +718,7 @@ test("readable hero, lightweight curved marquee, and motion adapt to pointer cap
   }
 
   await expectExternal(
-    page.getByRole("link", { name: /WhatsApp me/i }),
+    page.locator("[data-hero]").getByRole("link", { name: /WhatsApp me/i }),
     whatsappUrl,
   );
   await expect(

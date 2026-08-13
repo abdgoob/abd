@@ -212,7 +212,7 @@ img {
 .service-row a span,
 .section-cta span,
 .about-section a span,
-.contact-section a span {
+.contact-section a span[aria-hidden="true"] {
   display: inline-block;
   transition: transform 350ms var(--ease-out);
 }
@@ -226,7 +226,7 @@ img {
 .service-row a:hover span,
 .section-cta:hover span,
 .about-section a:hover span,
-.contact-section a:hover span {
+.contact-section a:hover span[aria-hidden="true"] {
   transform: translate(3px, -3px);
 }
 
@@ -1227,8 +1227,7 @@ img {
   letter-spacing: -0.035em;
 }
 
-.about-section__grid a,
-.contact-section__footer a {
+.about-section__grid a {
   font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1277,11 +1276,71 @@ img {
   letter-spacing: -0.03em;
 }
 
-.contact-section__footer a {
-  grid-column: 9 / -1;
-  justify-self: end;
+.contact-section__actions {
+  grid-column: 8 / -1;
+  display: grid;
+  width: 100%;
+}
+
+.contact-section__action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: clamp(4.25rem, 6vw, 5.5rem);
+  border-bottom: 1px solid var(--line);
   font-size: clamp(1rem, 1.9vw, 2rem);
-  text-align: right;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+.contact-section__action::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 320ms var(--ease-out);
+}
+
+.contact-section__action-label {
+  transition: transform 320ms var(--ease-out);
+}
+
+.contact-section__action--primary {
+  font-weight: 800;
+}
+
+.contact-section__action--secondary {
+  opacity: 0.58;
+  transition: opacity 220ms ease;
+}
+
+.contact-section__action--secondary:hover,
+.contact-section__action--secondary:focus-visible {
+  opacity: 1;
+}
+
+.contact-section__action:hover::after,
+.contact-section__action:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.contact-section__action:hover .contact-section__action-label,
+.contact-section__action:focus-visible .contact-section__action-label {
+  transform: translateX(0.25rem);
+}
+
+.contact-section__action:focus-visible .contact-section__action-arrow {
+  transform: translate(3px, -3px);
 }
 
 .contact-section__secondary {
@@ -1854,9 +1913,13 @@ img {
     max-width: 29rem;
   }
 
-  .contact-section__footer a {
-    display: inline-block;
+  .contact-section__actions {
+    width: 100%;
     margin-top: 2.5rem;
+  }
+
+  .contact-section__action {
+    min-height: 3.75rem;
     font-size: 1rem;
     text-align: left;
   }

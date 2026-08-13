@@ -1,5 +1,6 @@
 export type SiteConfig = {
   name: string;
+  calendlyUrl: string;
   whatsappUrl: string | null;
   email: string | null;
   linkedinUrl: string | null;
