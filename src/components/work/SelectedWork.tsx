@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Project, ProjectSlug } from "@/data/types";
 import { getGsap } from "@/lib/gsap";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { ProjectHalftoneMedia } from "@/components/work/ProjectHalftoneMedia";
+import { ProjectDescriptionWarp } from "@/components/work/ProjectDescriptionWarp";
 
 type SelectedWorkProps = {
   items: readonly Project[];
@@ -27,6 +28,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
   const activeSlug = useRef<ProjectSlug | null>(null);
   const requestedSlug = useRef<ProjectSlug | null>(null);
   const timelineRef = useRef<KillableTimeline | null>(null);
+  const [expandedDescriptionSlug, setExpandedDescriptionSlug] =
+    useState<ProjectSlug | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
       .querySelector<HTMLElement>(`[data-project-card-expand="${slug}"]`)
       ?.setAttribute("aria-expanded", "false");
     if (activeSlug.current === slug) activeSlug.current = null;
+    setExpandedDescriptionSlug((current) => (current === slug ? null : current));
     if (document.body.getAttribute("data-expanded-project") === slug) {
       document.body.removeAttribute("data-expanded-project");
     }
@@ -87,6 +91,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     if (!panel || !button || !row) return;
 
     activeSlug.current = slug;
+    setExpandedDescriptionSlug(slug);
     document.body.setAttribute("data-expanded-project", slug);
     setRows(slug);
     panel.hidden = false;
@@ -339,7 +344,10 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
 
                   <div className="project-inline__overview" data-project-detail-part>
                     <p>{project.category}</p>
-                    <p>{project.longDescription}</p>
+                    <ProjectDescriptionWarp
+                      active={expandedDescriptionSlug === project.slug}
+                      text={project.longDescription}
+                    />
                   </div>
 
                   <figure className="project-inline__hero" data-project-detail-part>

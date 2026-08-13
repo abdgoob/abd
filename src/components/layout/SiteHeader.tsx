@@ -15,12 +15,22 @@ export function SiteHeader() {
         <a className="cursor-target" href="#selected-work" data-scroll-nav="work">Work</a>
         <a className="cursor-target" href="#services" data-scroll-nav="services">Services</a>
         <a className="cursor-target" href="#about" data-scroll-nav="info">Info</a>
+        <a
+          href={site.calendlyUrl}
+          className="site-nav__cta site-nav__cta--calendly cursor-target"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-nav-action="calendly"
+        >
+          Book a call <span aria-hidden="true">↗</span>
+        </a>
         {site.whatsappUrl ? (
           <a
             href={site.whatsappUrl}
-            className="cursor-target"
+            className="site-nav__cta site-nav__cta--whatsapp cursor-target"
             target="_blank"
             rel="noopener noreferrer"
+            data-nav-action="whatsapp"
           >
             WhatsApp <span aria-hidden="true">↗</span>
           </a>

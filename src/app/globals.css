@@ -183,6 +183,10 @@ img {
   gap: clamp(0.9rem, 2.35vw, 2.8rem);
 }
 
+.site-nav__cta--calendly {
+  color: var(--bronze);
+}
+
 .site-nav a::after,
 .site-header__name::after {
   position: absolute;
@@ -901,14 +905,43 @@ img {
   text-transform: uppercase;
 }
 
-.project-inline__overview p:last-child {
+.project-description-warp {
+  --project-description-font-size: clamp(2.4rem, 5.2vw, 5.8rem);
+  position: relative;
   grid-column: 5 / -1;
+  min-width: 0;
   margin: 0;
-  font-size: clamp(2.4rem, 5.2vw, 5.8rem);
+  font-size: var(--project-description-font-size);
   font-weight: 700;
   letter-spacing: -0.065em;
   line-height: 0.94;
-  text-wrap: balance;
+}
+
+.project-description-warp__fallback {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-wrap: wrap;
+}
+
+.project-description-warp__fallback.is-hidden {
+  visibility: hidden;
+}
+
+.project-description-warp__active {
+  position: relative;
+}
+
+.project-description-warp__surface {
+  position: absolute;
+  inset: 0;
+}
+
+.project-description-warp__canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .project-inline__hero,
@@ -1618,9 +1651,40 @@ img {
   }
 
   .site-nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     width: 100%;
-    justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.7rem 0;
+  }
+
+  .site-nav a {
+    width: max-content;
+    white-space: nowrap;
+  }
+
+  .site-nav a[data-scroll-nav="work"] {
+    grid-column: 1 / span 2;
+    justify-self: start;
+  }
+
+  .site-nav a[data-scroll-nav="services"] {
+    grid-column: 3 / span 2;
+    justify-self: center;
+  }
+
+  .site-nav a[data-scroll-nav="info"] {
+    grid-column: 5 / span 2;
+    justify-self: end;
+  }
+
+  .site-nav__cta--calendly {
+    grid-column: 1 / span 3;
+    justify-self: start;
+  }
+
+  .site-nav__cta--whatsapp {
+    grid-column: 4 / -1;
+    justify-self: end;
   }
 
   .hero {
@@ -1754,9 +1818,9 @@ img {
     padding: 4rem 0;
   }
 
-  .project-inline__overview p:last-child {
+  .project-description-warp {
+    --project-description-font-size: clamp(2.15rem, 10.5vw, 3.6rem);
     margin-top: 2rem;
-    font-size: clamp(2.15rem, 10.5vw, 3.6rem);
   }
 
   .project-inline__hero img {
