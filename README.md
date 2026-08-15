@@ -24,15 +24,15 @@ npm run build
 npm run test:e2e
 ```
 
-The Playwright suite runs against a production server in desktop Chromium, mobile Chromium, and desktop WebKit. It covers the seven-project order, inline expansion, hash/history navigation, external links, keyboard and inert states, reduced motion, hero fallbacks, failed priority media, responsive overflow, cursor continuity, and a sustained scroll/resize stress pass.
+The Playwright suite runs against a production server in desktop Chromium, mobile Chromium, and desktop WebKit. It covers the eight-project order, inline expansion, hash/history navigation, external links, keyboard and inert states, reduced motion, hero fallbacks, failed priority media, responsive overflow, cursor continuity, and a sustained scroll/resize stress pass.
 
 ## Content and architecture
 
 - Typed content and contact configuration live in `src/data/`.
 - `/` is the complete experience: Hero → Selected Work → What I Build → How I Work → About → Contact.
-- All seven case studies expand inside the homepage. There are no internal project routes or duplicate semantic reel links.
+- All eight case studies expand inside the homepage. There are no internal project routes or duplicate semantic reel links.
 - Header navigation uses `#selected-work`, `#services`, and `#about`; `#contact` is also directly addressable.
-- CRAV's separate live-site action opens `https://www.cravburgers.shop/` in a protected new tab.
+- CRAV and VORTEX expose separate live-site actions that open their respective websites in protected new tabs.
 - One Lenis instance is connected to GSAP's ticker. The custom cursor and hover media use refs/GSAP setters rather than frame-by-frame React state.
 - Vercel's `VERCEL_PROJECT_PRODUCTION_URL` is used automatically for production metadata. `NEXT_PUBLIC_SITE_URL` remains an optional canonical-origin override.
 

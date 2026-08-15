@@ -45,6 +45,14 @@ const cravMedia = [
   },
 ] as const;
 
+const vortexCover = {
+  src: "/media/vortex/vortex-hero.webp",
+  alt: "VORTEX Gym hero experience featuring its structural iron dumbbell",
+  width: 1600,
+  height: 1000,
+  label: "Hero experience",
+} as const;
+
 const zensMedia = [
   {
     src: "/media/zens-den/zens-hero.webp",
@@ -151,6 +159,31 @@ export const projects = [
       "Creative frontend development",
     ],
     palette: { background: "#f3dfc8", foreground: "#ee2217", accent: "#ffc719" },
+  },
+  {
+    slug: "vortex",
+    title: ["VOR", "TEX"],
+    compactTitle: "VORTEX",
+    category: "GYM / FITNESS EXPERIENCE",
+    role: "Design & Development",
+    shortDescription:
+      "A bold fitness website built around strong visual hierarchy, immersive motion, clear membership positioning, and a high-energy digital experience designed to make the gym feel as powerful online as it does in person.",
+    longDescription:
+      "A bold fitness website built around strong visual hierarchy, immersive motion, clear membership positioning, and a high-energy digital experience designed to make the gym feel as powerful online as it does in person.",
+    liveUrl: "https://gym-vortex.vercel.app/",
+    contactLabel: "Want something like this?",
+    cover: vortexCover,
+    media: [vortexCover],
+    capabilities: [
+      "Strong visual hierarchy",
+      "Immersive motion",
+      "Clear membership positioning",
+      "High-energy art direction",
+      "Fitness-focused experience",
+      "Conversion-focused calls to action",
+      "Responsive design",
+    ],
+    palette: { background: "#f6f6f1", foreground: "#050505", accent: "#666660" },
   },
   {
     slug: "zens-den",

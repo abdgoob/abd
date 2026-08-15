@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const projectSlugs = [
   "crav",
+  "vortex",
   "zens-den",
   "north-co",
   "nova-ai",
@@ -10,8 +11,14 @@ const projectSlugs = [
   "northstar",
 ] as const;
 
+const liveProjectSlugs: ReadonlySet<(typeof projectSlugs)[number]> = new Set([
+  "crav",
+  "vortex",
+]);
+
 const capabilityCounts: Record<(typeof projectSlugs)[number], number> = {
   crav: 8,
+  vortex: 7,
   "zens-den": 7,
   "north-co": 7,
   "nova-ai": 7,
@@ -58,7 +65,7 @@ async function expectExternal(link: Locator, href: string) {
   await expect(link).toHaveAttribute("rel", /noreferrer/);
 }
 
-test("homepage is one ordered seven-project experience with honest contact UI", async ({ page }) => {
+test("homepage is one ordered eight-project experience with honest contact UI", async ({ page }) => {
   await page.goto("/?webgl-off");
   await waitForExperience(page);
 
@@ -71,10 +78,10 @@ test("homepage is one ordered seven-project experience with honest contact UI", 
   expect(sectionOrder).toEqual(["home", "selected-work", "services", "process", "about", "contact"]);
 
   const rows = page.locator("[data-project-index] > [data-project-row]");
-  await expect(rows).toHaveCount(7);
+  await expect(rows).toHaveCount(8);
   expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute("data-project-row")))).toEqual(projectSlugs);
   await expect(page.locator('[data-project-index] a[href^="/work/"]')).toHaveCount(0);
-  await expect(page.locator("[data-project-expand]")).toHaveCount(7);
+  await expect(page.locator("[data-project-expand]")).toHaveCount(8);
 
   const visibleCopy = await page.locator("body").innerText();
   expect(visibleCopy).not.toMatch(/concept project|demo project|fake project|mock project/i);
@@ -158,7 +165,7 @@ test("first and last case studies expand inline without changing route", async (
   await expect(page.locator('[data-project-panel="crav"]')).toHaveAttribute("inert", "");
 });
 
-test("all seven inline studies expose the requested capability systems", async ({ page }, testInfo) => {
+test("all eight inline studies expose the requested capability systems", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium");
   await page.goto("/?webgl-off#selected-work");
   await waitForExperience(page);
@@ -215,7 +222,7 @@ test("other cards and Halftone cover actions remain accessible while a project i
 
   for (const slug of projectSlugs) {
     const coverAction = page.locator(
-      slug === "crav"
+      liveProjectSlugs.has(slug)
         ? `[data-project-card-live="${slug}"]`
         : `[data-project-card-expand="${slug}"]`,
     );
@@ -244,7 +251,7 @@ test("other cards and Halftone cover actions remain accessible while a project i
   await expect(nextCover).toHaveAttribute("aria-expanded", "true");
 });
 
-test("CRAV live site and every project contact CTA are external and exact", async ({ page }) => {
+test("live project sites and every project contact CTA are external and exact", async ({ page }) => {
   await page.goto("/?webgl-off");
   await waitForExperience(page);
 
@@ -260,11 +267,26 @@ test("CRAV live site and every project contact CTA are external and exact", asyn
   await expect(page.locator('[data-project-card-live="crav"]')).toContainText(
     "Visit cravburgers.shop",
   );
-  await expect(page.locator("[data-project-card-live]")).toHaveCount(1);
-  await expect(page.locator("[data-project-card-expand]")).toHaveCount(
-    projectSlugs.length - 1,
+  await expectExternal(
+    page.locator('[data-project-live="vortex"]'),
+    "https://gym-vortex.vercel.app/",
   );
-  for (const slug of projectSlugs.filter((slug) => slug !== "crav")) {
+  await expect(page.locator('[data-project-live="vortex"]')).toContainText(
+    "View live site",
+  );
+  await expectExternal(
+    page.locator('[data-project-card-live="vortex"]'),
+    "https://gym-vortex.vercel.app/",
+  );
+  await expect(page.locator('[data-project-card-live="vortex"]')).toContainText(
+    "Visit gym-vortex.vercel.app",
+  );
+  await expect(page.locator("[data-project-live]")).toHaveCount(liveProjectSlugs.size);
+  await expect(page.locator("[data-project-card-live]")).toHaveCount(liveProjectSlugs.size);
+  await expect(page.locator("[data-project-card-expand]")).toHaveCount(
+    projectSlugs.length - liveProjectSlugs.size,
+  );
+  for (const slug of projectSlugs.filter((slug) => !liveProjectSlugs.has(slug))) {
     const coverAction = page.locator(`[data-project-card-expand="${slug}"]`);
     await expect(coverAction).toContainText("Explore project");
     await expect(coverAction).toHaveAttribute(
@@ -321,8 +343,8 @@ test("collapsed details are isolated and keyboard controls restore focus", async
   await page.goto("/?webgl-off#selected-work");
   await waitForExperience(page);
 
-  await expect(page.locator('[data-project-panel][aria-hidden="true"]')).toHaveCount(7);
-  await expect(page.locator('[data-project-panel][inert]')).toHaveCount(7);
+  await expect(page.locator('[data-project-panel][aria-hidden="true"]')).toHaveCount(8);
+  await expect(page.locator('[data-project-panel][inert]')).toHaveCount(8);
   await expect(page.locator(".work-list__visual-clone")).toHaveCount(0);
 
   const explore = page.locator('[data-project-expand="zens-den"]');
@@ -335,6 +357,70 @@ test("collapsed details are isolated and keyboard controls restore focus", async
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-project-panel="zens-den"]')).toHaveAttribute("data-expansion-state", "closed");
   await expect(explore).toBeFocused();
+});
+
+test("top close controls collapse CRAV, VORTEX, and ZEN'S DEN without residue", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/?webgl-off#selected-work");
+  await waitForExperience(page);
+
+  for (const slug of ["crav", "vortex", "zens-den"] as const) {
+    const trigger = page.locator(`[data-project-expand="${slug}"]`);
+    const panel = await openProject(page, slug);
+    const close = panel.locator('[data-project-collapse-position="top"]');
+
+    await expect(close).toBeVisible();
+    await expect(close).toHaveRole("button");
+    await expect(close).toHaveAttribute("aria-label", "Close project details");
+    await expect(close).toContainText("Back to work");
+    await expect(panel.locator("[data-project-warp-text] canvas")).toHaveCount(1);
+
+    await close.click();
+
+    await expect(panel).toHaveAttribute("data-expansion-state", "closed");
+    await expect(panel).toHaveAttribute("aria-hidden", "true");
+    await expect(panel).toHaveAttribute("inert", "");
+    await expect(panel.locator("[data-project-warp-text] canvas")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(page.locator("body")).not.toHaveAttribute(
+      "data-expanded-project",
+      /.+/,
+    );
+    await expect(page.locator('[data-project-active="true"]')).toHaveCount(0);
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  }
+
+  const workLink = page.locator('[data-scroll-nav="work"]');
+  await workLink.hover();
+  await expect(page.locator("[data-target-cursor]")).toHaveAttribute(
+    "data-target-state",
+    "active",
+  );
+});
+
+test("Escape closes the active project and restores its Explore trigger", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.goto("/?webgl-off#selected-work");
+  await waitForExperience(page);
+
+  const trigger = page.locator('[data-project-expand="vortex"]');
+  const panel = await openProject(page, "vortex");
+  await expect(panel.locator("[data-project-warp-text] canvas")).toHaveCount(1);
+
+  await page.keyboard.press("Escape");
+
+  await expect(panel).toHaveAttribute("data-expansion-state", "closed");
+  await expect(panel.locator("[data-project-warp-text] canvas")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('[data-expansion-state="open"]')).toHaveCount(0);
+  await expect(page.locator("body")).not.toHaveAttribute(
+    "data-expanded-project",
+    /.+/,
+  );
 });
 
 test("every project cover uses its own viewport-scoped halftone reveal", async ({
@@ -451,6 +537,10 @@ test("a non-CRAV HalftoneReveal cover opens its inline project", async ({
     "data-expanded-project",
     slug,
   );
+
+  await panel.locator('[data-project-collapse-position="top"]').click();
+  await expect(panel).toHaveAttribute("data-expansion-state", "closed");
+  await expect(coverAction).toBeFocused();
 });
 
 test("desktop projects form a scroll-driven sticky stack", async ({
@@ -849,8 +939,27 @@ test("mobile keeps direct navigation, removes the cursor, and expands in place",
   await expect(page.locator('[data-scroll-nav="services"]')).toBeVisible();
   await expect(page.locator('[data-scroll-nav="info"]')).toBeVisible();
   await expect(page.getByRole("link", { name: /WhatsApp/i }).first()).toBeVisible();
-  await openProject(page, "north-co");
-  await expect(page.locator('[data-project-panel="north-co"]')).toBeVisible();
+  const trigger = page.locator('[data-project-expand="north-co"]');
+  const panel = await openProject(page, "north-co");
+  const close = panel.locator('[data-project-collapse-position="top"]');
+  await expect(panel).toBeVisible();
+  await expect(close).toBeVisible();
+  await expect(close).toHaveAttribute("aria-label", "Close project details");
+
+  const closeSize = await close.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(closeSize.width).toBeGreaterThanOrEqual(44);
+  expect(closeSize.height).toBeGreaterThanOrEqual(44);
+
+  await close.click();
+  await expect(panel).toHaveAttribute("data-expansion-state", "closed");
+  await expect(trigger).toBeFocused();
+  await expect(page.locator("body")).not.toHaveAttribute(
+    "data-expanded-project",
+    /.+/,
+  );
 });
 
 test("coarse pointers keep all project covers as static original images", async ({ page }, testInfo) => {
@@ -858,8 +967,8 @@ test("coarse pointers keep all project covers as static original images", async 
   await page.goto("/#selected-work");
   await waitForExperience(page);
 
-  await expect(page.locator('[data-project-halftone][data-halftone-state="fallback"]')).toHaveCount(7);
-  await expect(page.locator("[data-project-halftone] img")).toHaveCount(7);
+  await expect(page.locator('[data-project-halftone][data-halftone-state="fallback"]')).toHaveCount(8);
+  await expect(page.locator("[data-project-halftone] img")).toHaveCount(8);
   await expect(page.locator("[data-project-halftone] canvas")).toHaveCount(0);
 });
 

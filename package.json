@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint src tests scripts playwright.config.ts next.config.ts postcss.config.mjs eslint.config.mjs",
     "test:e2e": "playwright test",
-    "capture:crav": "node scripts/capture-crav.mjs"
+    "capture:crav": "node scripts/capture-crav.mjs",
+    "capture:vortex": "node scripts/capture-vortex.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

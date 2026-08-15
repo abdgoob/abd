@@ -27,13 +27,29 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
   const rowsRef = useRef(new Map<ProjectSlug, HTMLElement>());
   const activeSlug = useRef<ProjectSlug | null>(null);
   const requestedSlug = useRef<ProjectSlug | null>(null);
+  const openerRef = useRef<{
+    slug: ProjectSlug;
+    element: HTMLButtonElement;
+  } | null>(null);
+  const closeActiveProjectRef = useRef<() => void>(() => undefined);
   const timelineRef = useRef<KillableTimeline | null>(null);
   const [expandedDescriptionSlug, setExpandedDescriptionSlug] =
     useState<ProjectSlug | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.repeat) return;
+      if (!activeSlug.current) return;
+
+      event.preventDefault();
+      closeActiveProjectRef.current();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
+      document.removeEventListener("keydown", handleKeyDown);
       timelineRef.current?.kill();
       document.body.removeAttribute("data-expanded-project");
     };
@@ -55,6 +71,10 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     const button = buttonsRef.current.get(slug);
     const row = rowsRef.current.get(slug);
     if (!panel || !button || !row) return;
+    const opener =
+      openerRef.current?.slug === slug && openerRef.current.element.isConnected
+        ? openerRef.current.element
+        : button;
 
     panel.hidden = true;
     panel.inert = true;
@@ -75,12 +95,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     notifyLayoutChange();
 
     if (restoreFocus) {
-      button.focus({ preventScroll: true });
-      const top = row.getBoundingClientRect().top + window.scrollY - 82;
-      window.dispatchEvent(
-        new CustomEvent("portfolio:scroll-to", { detail: { top, immediate: reducedMotion } }),
-      );
+      opener.focus({ preventScroll: true });
     }
+    if (openerRef.current?.slug === slug) openerRef.current = null;
   };
 
   const expand = (slug: ProjectSlug) => {
@@ -146,6 +163,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
   ) => {
     const panel = panelsRef.current.get(slug);
     const button = buttonsRef.current.get(slug);
+    const row = rowsRef.current.get(slug);
     if (!panel || !button || panel.hidden) {
       finishClosed(slug, restoreFocus);
       onComplete?.();
@@ -155,6 +173,15 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     timelineRef.current?.kill();
     panel.dataset.expansionState = "closing";
     button.setAttribute("aria-expanded", "false");
+
+    if (restoreFocus && row) {
+      const top = row.getBoundingClientRect().top + window.scrollY - 82;
+      window.dispatchEvent(
+        new CustomEvent("portfolio:scroll-to", {
+          detail: { top, immediate: reducedMotion },
+        }),
+      );
+    }
 
     if (reducedMotion) {
       finishClosed(slug, restoreFocus);
@@ -178,7 +205,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     timelineRef.current = timeline;
   };
 
-  const requestOpen = (slug: ProjectSlug) => {
+  const requestOpen = (slug: ProjectSlug, opener: HTMLButtonElement) => {
+    openerRef.current = { slug, element: opener };
     requestedSlug.current = slug;
     const current = activeSlug.current;
     if (current === slug) return;
@@ -197,6 +225,13 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     if (activeSlug.current === slug) collapse(slug, true);
   };
 
+  useEffect(() => {
+    closeActiveProjectRef.current = () => {
+      const current = activeSlug.current;
+      if (current) requestClose(current);
+    };
+  });
+
   return (
     <section
       id="selected-work"
@@ -206,7 +241,7 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
     >
       <div className="section-heading section-heading--work">
         <p>Selected work</p>
-        <p>Seven digital experiences / Scroll through</p>
+        <p>Eight digital experiences / Scroll through</p>
       </div>
       <div className="selected-work__intro">
         <h2 id="selected-work-title">Work built to move people — and business.</h2>
@@ -272,7 +307,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                     ref={(node) => {
                       if (node) buttonsRef.current.set(project.slug, node);
                     }}
-                    onClick={() => requestOpen(project.slug)}
+                    onClick={(event) =>
+                      requestOpen(project.slug, event.currentTarget)
+                    }
                   >
                     Explore project <span aria-hidden="true">↓</span>
                   </button>
@@ -310,7 +347,9 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                       aria-expanded="false"
                       aria-controls={panelId}
                       data-project-card-expand={project.slug}
-                      onClick={() => requestOpen(project.slug)}
+                      onClick={(event) =>
+                        requestOpen(project.slug, event.currentTarget)
+                      }
                     >
                       {coverMedia}
                       <span className="project-row__cover-cta">
@@ -340,6 +379,16 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                   <header className="project-inline__header" data-project-detail-part>
                     <span>Inside the project</span>
                     <p>{project.role}</p>
+                    <button
+                      type="button"
+                      className="project-inline__close cursor-target"
+                      aria-label="Close project details"
+                      data-project-collapse={project.slug}
+                      data-project-collapse-position="top"
+                      onClick={() => requestClose(project.slug)}
+                    >
+                      Back to work <span aria-hidden="true">↑</span>
+                    </button>
                   </header>
 
                   <div className="project-inline__overview" data-project-detail-part>
@@ -417,7 +466,8 @@ export function SelectedWork({ items, whatsappUrl }: SelectedWorkProps) {
                     <button
                       type="button"
                       className="cursor-target"
-                      data-project-collapse={project.slug}
+                      aria-label="Close project details"
+                      data-project-collapse-footer={project.slug}
                       onClick={() => requestClose(project.slug)}
                     >
                       Back to work <span aria-hidden="true">↑</span>

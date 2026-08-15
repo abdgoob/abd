@@ -212,6 +212,7 @@ img {
 .site-header a span[aria-hidden="true"],
 .hero__actions a span,
 .project-row__actions span,
+.project-inline__close span,
 .project-inline__footer span,
 .service-row a span,
 .section-cta span,
@@ -225,6 +226,7 @@ img {
 .hero__actions a:hover span,
 .project-row__actions a:hover span,
 .project-row__actions button:hover span,
+.project-inline__close:hover span,
 .project-inline__footer a:hover span,
 .project-inline__footer button:hover span,
 .service-row a:hover span,
@@ -873,7 +875,8 @@ img {
 
 .project-inline__header {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: 1rem;
   padding-bottom: 0.8rem;
   border-bottom: 1px solid color-mix(in srgb, currentColor 38%, transparent);
@@ -887,6 +890,18 @@ img {
   justify-self: end;
   margin: 0;
   text-align: right;
+}
+
+.project-inline__close {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-self: end;
+  gap: 0.5rem;
+  padding: 0.68rem 0.82rem;
+  border: 1px solid color-mix(in srgb, currentColor 48%, transparent);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .project-inline__overview {
@@ -1813,6 +1828,30 @@ img {
     padding-top: 1.5rem;
   }
 
+  .project-inline__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem 0.75rem;
+  }
+
+  .project-inline__header > span {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .project-inline__header p {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .project-inline__close {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 3rem;
+    padding: 0.75rem 0.85rem;
+  }
+
   .project-inline__overview {
     display: block;
     padding: 4rem 0;
@@ -2036,7 +2075,7 @@ img {
   }
 
   .project-inline__header {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .project-inline__header p {

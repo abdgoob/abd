@@ -8,6 +8,7 @@ export type SiteConfig = {
 
 export type ProjectSlug =
   | "crav"
+  | "vortex"
   | "zens-den"
   | "north-co"
   | "nova-ai"
