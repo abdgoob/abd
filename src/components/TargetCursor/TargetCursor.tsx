@@ -428,13 +428,13 @@ const TargetCursor = ({
     const layoutHandler = () => scheduleTargetGeometry();
 
     const pointerDownHandler = () => {
-      gsap.to(dot, { scale: 0.7, duration: 0.18, overwrite: true });
-      gsap.to(cursor, { scale: 0.9, duration: 0.16, overwrite: true });
+      gsap.to(dot, { scale: 0.7, duration: 0.18, overwrite: "auto" });
+      gsap.to(cursor, { scale: 0.9, duration: 0.16, overwrite: "auto" });
     };
 
     const pointerUpHandler = () => {
-      gsap.to(dot, { scale: 1, duration: 0.18, overwrite: true });
-      gsap.to(cursor, { scale: 1, duration: 0.16, overwrite: true });
+      gsap.to(dot, { scale: 1, duration: 0.18, overwrite: "auto" });
+      gsap.to(cursor, { scale: 1, duration: 0.16, overwrite: "auto" });
     };
 
     createSpinTimeline();
@@ -444,6 +444,8 @@ const TargetCursor = ({
     window.addEventListener("pointerout", pointerOutHandler, { passive: true });
     window.addEventListener("pointerdown", pointerDownHandler, { passive: true });
     window.addEventListener("pointerup", pointerUpHandler, { passive: true });
+    window.addEventListener("pointercancel", pointerUpHandler, { passive: true });
+    window.addEventListener("blur", pointerUpHandler);
     window.addEventListener("scroll", scrollHandler, { passive: true });
     window.addEventListener("resize", resizeHandler, { passive: true });
     window.addEventListener("portfolio:layout-change", layoutHandler);
@@ -454,6 +456,8 @@ const TargetCursor = ({
       window.removeEventListener("pointerout", pointerOutHandler);
       window.removeEventListener("pointerdown", pointerDownHandler);
       window.removeEventListener("pointerup", pointerUpHandler);
+      window.removeEventListener("pointercancel", pointerUpHandler);
+      window.removeEventListener("blur", pointerUpHandler);
       window.removeEventListener("scroll", scrollHandler);
       window.removeEventListener("resize", resizeHandler);
       window.removeEventListener("portfolio:layout-change", layoutHandler);
